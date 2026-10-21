@@ -1,0 +1,176 @@
+import { Service, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { AuthApi } from './auth-api';
+import { AuthUser, LoginCredentials, LoginResponse } from './auth.model';
+
+/**
+ * Cle de stockage du jeton d'authentification.
+ *
+ * NOTE SECURITE : le jeton est stocke dans `localStorage`, ce qui l'expose a
+ * une éventuelle XSS. Le cookie `HttpOnly` serait plus sûr mais impose
+ * `supports_credentials => true` côté CORS, ce qui n'est pas possible ici
+ * (le frontend et l'API sont sur des origines distinctes en developpement).
+ * A arbitrer lors du passage en production.
+ */
+const TOKEN_STORAGE_KEY = 'quincaillerie.token';
+
+/** Etat d'authentification expose a l'interface. */
+export type AuthStatus = 'anonymous' | 'authenticating' | 'authenticated';
+
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } catch {
+    // Stockage indisponible (navigation privee, quota) : la session reste
+    // valable en memoire jusqu'au rechargement de la page.
+  }
+}
+
+function removeStoredToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Rien a faire.
+  }
+}
+
+/** Reconstruit un `AuthUser` a partir de la reponse partielle de `/api/login`. */
+function toAuthUser(partial: LoginResponse['user']): AuthUser {
+  return {
+    id: null,
+    name: partial.name,
+    email: partial.email,
+    is_active: true,
+    roles: partial.roles ?? [],
+    permissions: [],
+  };
+}
+
+/**
+ * Etat d'authentification de l'application, gere par signaux.
+ *
+ * `AuthStore` est la source de verite unique : l'intercepteur HTTP lit le
+ * jeton ici, les guards lisent `isAuthenticated()` ici, et les composants
+ * lisent `user()`, `roles()`, `permissions()`.
+ */
+@Service()
+export class AuthStore {
+  private readonly api = inject(AuthApi);
+
+  private readonly _token = signal<string | null>(readStoredToken());
+  private readonly _user = signal<AuthUser | null>(null);
+  private readonly _status = signal<AuthStatus>('anonymous');
+
+  /** Jeton Bearer courant, injecte dans l'en-tete `Authorization`. */
+  readonly token = this._token.asReadonly();
+
+  /** Profil de l'utilisateur connecte, `null` si non connecte. */
+  readonly user = this._user.asReadonly();
+
+  /** Statut de l'authentification. */
+  readonly status = this._status.asReadonly();
+
+  /** Vrai des qu'un jeton est disponible. */
+  readonly isAuthenticated = computed(() => this._token() !== null);
+
+  /** Roles de l'utilisateur connecte (`Admin`, `Gerant`, `Employe`). */
+  readonly roles = computed(() => this._user()?.roles ?? []);
+
+  /** Permissions Spatie de l'utilisateur connecte. */
+  readonly permissions = computed(() => this._user()?.permissions ?? []);
+
+  /** Nom affiche, pour l'en-tete de l'application. */
+  readonly displayName = computed(() => this._user()?.name ?? '');
+
+  /** Initiales pour l'avatar de l'en-tete. */
+  readonly initials = computed(() => {
+    const name = this._user()?.name?.trim() ?? '';
+    if (!name) {
+      return '';
+    }
+    return name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('');
+  });
+
+  /** Vrai si l'utilisateur possede au moins un des roles donnes. */
+  hasRole(...roles: string[]): boolean {
+    return roles.some((role) => this.roles().includes(role));
+  }
+
+  /** Vrai si l'utilisateur possede au moins une des permissions donnees. */
+  hasPermission(...permissions: string[]): boolean {
+    return permissions.some((permission) => this.permissions().includes(permission));
+  }
+
+  /**
+   * Connecte l'utilisateur et persiste le jeton.
+   *
+   * Apres `POST /api/login`, on appelle `GET /api/me` pour obtenir le profil
+   * complet (`id`, `is_active`, `permissions`). Si cet appel echoue, on
+   * conserve le profil minimal renvoye par le login plutot que de faire
+   * echouer la connexion.
+   */
+  async signIn(credentials: LoginCredentials): Promise<AuthUser> {
+    this._status.set('authenticating');
+
+    try {
+      const response = await firstValueFrom(this.api.login(credentials));
+
+      this._token.set(response.token);
+      writeStoredToken(response.token);
+
+      const user = await this.refreshProfile().catch(() => toAuthUser(response.user));
+      this._user.set(user);
+      this._status.set('authenticated');
+
+      return user;
+    } catch (error) {
+      this.clear();
+      this._status.set('anonymous');
+      throw error;
+    }
+  }
+
+  /**
+   * Recharge le profil depuis `GET /api/me`.
+   *
+   * A appeler au demarrage de l'application pour restaure une session
+   * persistee (le jeton est dans `localStorage`, mais pas le profil).
+   */
+  async refreshProfile(): Promise<AuthUser> {
+    const response = await firstValueFrom(this.api.me());
+    this._user.set(response.user);
+    return response.user;
+  }
+
+  /** Deconnecte l'utilisateur et purge le jeton local. */
+  async signOut(): Promise<void> {
+    try {
+      await firstValueFrom(this.api.logout());
+    } catch {
+      // Le jeton distant n'a pas pu etre revoque : on purge quand meme le
+      // jeton local pour ne pas laisser une session fantome active.
+    } finally {
+      this.clear();
+      this._status.set('anonymous');
+    }
+  }
+
+  /** Purge l'etat local d'authentification. */
+  clear(): void {
+    this._token.set(null);
+    this._user.set(null);
+    removeStoredToken();
+  }
+}

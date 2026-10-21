@@ -1,0 +1,12 @@
+# Dependances (npm / composer)
+node_modules/
+vendor/
+
+# Artefacts de build
+dist/
+.angular/
+
+# Variables d'environnement (contiennent des secrets)
+.env
+.env.*
+!.env.example

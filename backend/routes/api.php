@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CashSessionController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
@@ -21,6 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('suppliers', SupplierController::class);
+
+    // Tableau de bord : statistiques agregees (montants masques aux employes).
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // Utilisateurs : accessible aux comptes autorises a gérer les comptes.
     Route::apiResource('users', UserController::class);

@@ -10,7 +10,10 @@ import { ApiErrorBody } from './api-error.model';
  * - 0 (reseau indisponible / CORS bloque) : message explicite.
  * - autres : message du serveur, sinon message de repli.
  */
-export function extractErrorMessage(error: unknown, fallback = 'Une erreur inattendue est survenue.'): string {
+export function extractErrorMessage(
+  error: unknown,
+  fallback = 'Une erreur inattendue est survenue.',
+): string {
   if (!(error instanceof HttpErrorResponse)) {
     return fallback;
   }
@@ -29,7 +32,7 @@ export function extractErrorMessage(error: unknown, fallback = 'Une erreur inatt
   }
 
   if (error.status === 0) {
-    return "Le serveur est injoignable. Verifiez que le backend est demarre sur http://localhost:8000.";
+    return 'Le serveur est injoignable. Verifiez que le backend est demarre sur http://localhost:8000.';
   }
 
   return fallback;

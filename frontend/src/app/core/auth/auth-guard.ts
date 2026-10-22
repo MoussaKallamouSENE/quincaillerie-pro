@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthStore } from './auth-store';
+import { AuthService } from './auth-service';
 
 /**
  * Protege les routes de l'application authentifiee.
@@ -13,10 +13,10 @@ import { AuthStore } from './auth-store';
  * (middleware `can:` / policies Laravel).
  */
 export const authGuard: CanActivateFn = (_route, state) => {
-  const store = inject(AuthStore);
+  const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (store.isAuthenticated()) {
+  if (auth.isAuthenticated()) {
     return true;
   }
 
@@ -25,12 +25,15 @@ export const authGuard: CanActivateFn = (_route, state) => {
 
 /**
  * Empeche d'afficher la page de connexion a un utilisateur deja connecte.
+ *
+ * La redirection cible `/dashboard` et non `/` : la route par defaut redirige
+ * elle-meme vers `/login`, ce qui provoquerait une boucle de redirection.
  */
 export const guestGuard: CanActivateFn = () => {
-  const store = inject(AuthStore);
+  const auth = inject(AuthService);
   const router = inject(Router);
 
-  return store.isAuthenticated() ? router.createUrlTree(['/']) : true;
+  return auth.isAuthenticated() ? router.createUrlTree(['/dashboard']) : true;
 };
 
 /**
@@ -42,13 +45,13 @@ export const guestGuard: CanActivateFn = () => {
  */
 export function roleGuard(allowedRoles: string[]): CanActivateFn {
   return (_route, state) => {
-    const store = inject(AuthStore);
+    const auth = inject(AuthService);
     const router = inject(Router);
 
-    if (store.hasRole(...allowedRoles)) {
+    if (auth.hasRole(...allowedRoles)) {
       return true;
     }
 
-    return router.createUrlTree(['/'], { queryParams: { denied: state.url } });
+    return router.createUrlTree(['/dashboard'], { queryParams: { denied: state.url } });
   };
 }

@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    /** @use HasFactory<ProductFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'sku',
         'name',
@@ -46,5 +51,8 @@ class Product extends Model
         return $this->hasMany(PurchaseItem::class);
     }
 
-    public function saleItems() { return $this->hasMany(SaleItem::class); }
+    public function saleItems()
+    {
+        return $this->hasMany(SaleItem::class);
+    }
 }

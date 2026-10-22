@@ -1,7 +1,13 @@
-import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
+﻿import { TestBed } from '@angular/core/testing';
+import {
+  ActivatedRouteSnapshot,
+  Router,
+  RouterStateSnapshot,
+  UrlTree,
+  provideRouter,
+} from '@angular/router';
 import { AuthApi } from './auth-api';
-import { AuthStore } from './auth-store';
+import { AuthService } from './auth-service';
 import { authGuard, guestGuard, roleGuard } from './auth-guard';
 import { of } from 'rxjs';
 import type { LoginResponse, MeResponse } from './auth.model';
@@ -23,7 +29,7 @@ const LOGIN_RESPONSE: LoginResponse = {
 };
 
 describe('authGuard', () => {
-  let store: AuthStore;
+  let store: AuthService;
   let router: Router;
 
   const route = {} as ActivatedRouteSnapshot;
@@ -46,7 +52,7 @@ describe('authGuard', () => {
       ],
     });
 
-    store = TestBed.inject(AuthStore);
+    store = TestBed.inject(AuthService);
     router = TestBed.inject(Router);
   });
 

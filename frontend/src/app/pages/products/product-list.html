@@ -1,0 +1,514 @@
+<div>
+  <!-- Titre + actions -->
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Produits</h1>
+      <p class="mt-1 text-sm text-slate-400">Gérez le catalogue de votre quincaillerie</p>
+    </div>
+
+    <button
+      type="button"
+      (click)="onCreateProduct()"
+      class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+    >
+      <svg
+        class="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-hidden="true"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Nouveau Produit
+    </button>
+  </div>
+
+  <!-- Catalogue -->
+  <section
+    class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+    >
+      <!-- Recherche -->
+      <div class="relative w-full max-w-sm">
+        <svg
+          class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+          />
+        </svg>
+        <input
+          type="search"
+          placeholder="Rechercher un produit par nom…"
+          aria-label="Rechercher un produit par nom"
+          [value]="searchTerm()"
+          (input)="onSearch($event)"
+          class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-3 pl-10 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <p class="text-sm text-slate-400">
+        <span class="font-semibold text-slate-200">{{ resultCount() }}</span>
+        @if (resultCount() > 1) {
+          produits
+        } @else {
+          produit
+        }
+        @if (searchTerm().trim()) {
+          sur {{ totalCount() }}
+        }
+      </p>
+    </header>
+
+    @if (products.isLoading()) {
+      <!-- Chargement -->
+      <p class="sr-only" role="status">Chargement du catalogue…</p>
+      <div class="overflow-x-auto" aria-hidden="true">
+        <table class="w-full min-w-[760px] text-left text-sm">
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+              <tr>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-20 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-48 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-6 w-24 animate-pulse rounded-full bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-8 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (products.error()) {
+      <!-- Erreur -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-red-400 ring-1 ring-red-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </span>
+        <p class="mt-4 text-sm font-medium text-red-300">Catalogue indisponible</p>
+        <p class="mt-1 text-xs text-slate-400">{{ errorMessage() }}</p>
+        <button
+          type="button"
+          (click)="reload()"
+          class="mt-4 rounded-lg border border-red-500/40 px-3.5 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+        >
+          Réessayer
+        </button>
+      </div>
+    } @else if (filteredProducts().length === 0) {
+      <!-- Catalogue vide -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+            />
+          </svg>
+        </span>
+        @if (isEmptySearch()) {
+          <p class="mt-4 text-sm font-medium text-slate-200">
+            Aucun produit ne correspond à « {{ searchTerm().trim() }} »
+          </p>
+          <p class="mt-1 text-xs text-slate-400">Essayez un autre terme de recherche.</p>
+          <button
+            type="button"
+            (click)="clearSearch()"
+            class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40"
+          >
+            Réinitialiser la recherche
+          </button>
+        } @else {
+          <p class="mt-4 text-sm font-medium text-slate-200">Aucun produit dans le catalogue</p>
+          <p class="mt-1 text-xs text-slate-400">
+            Créez votre premier produit pour commencer à vendre.
+          </p>
+        }
+      </div>
+    } @else {
+      <!-- Tableau -->
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[760px] text-left text-sm">
+          <caption class="sr-only">
+            Catalogue des produits
+          </caption>
+
+          <thead>
+            <tr
+              class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
+            >
+              <th scope="col" class="px-6 py-3 font-medium">SKU</th>
+              <th scope="col" class="px-6 py-3 font-medium">Nom</th>
+              <th scope="col" class="px-6 py-3 font-medium">Catégorie</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Prix d'achat</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Prix de vente</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Stock</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (product of filteredProducts(); track product.id) {
+              <tr class="transition hover:bg-emerald-900/30">
+                <td class="px-6 py-4 font-medium text-emerald-400">{{ product.sku }}</td>
+                <td class="px-6 py-4 font-medium text-slate-100">{{ product.name }}</td>
+                <td class="px-6 py-4">
+                  <span
+                    class="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/20"
+                  >
+                    {{ product.category.name }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right text-slate-400">
+                  {{ product.purchase_price | number: '1.2-2' }}
+                  <span class="text-xs text-slate-500">FCFA</span>
+                </td>
+                <td class="px-6 py-4 text-right font-medium text-slate-100">
+                  {{ product.sale_price | number: '1.2-2' }}
+                  <span class="text-xs text-slate-500">FCFA</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  @if (product.is_low_stock) {
+                    <span
+                      class="font-semibold text-red-400"
+                      [attr.title]="'Seuil d’alerte : ' + product.min_stock_alert"
+                    >
+                      {{ product.stock_quantity }}
+                    </span>
+                  } @else {
+                    <span class="text-slate-200">{{ product.stock_quantity }}</span>
+                  }
+                  <span class="ml-1 text-xs text-slate-500">{{ product.unit.symbol }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- Modale de creation d'un produit -->
+  @if (isModalOpen()) {
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      (click)="closeModal()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-product-title"
+        class="my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-800/60 bg-[#153322] shadow-2xl shadow-emerald-950/60"
+        (click)="$event.stopPropagation()"
+      >
+        <!-- En-tete -->
+        <header
+          class="flex items-start justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+        >
+          <div>
+            <h2 id="create-product-title" class="text-lg font-semibold text-slate-100">
+              Nouveau Produit
+            </h2>
+            <p class="mt-1 text-xs text-slate-400">
+              Ajoutez un article à votre catalogue de quincaillerie.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            (click)="closeModal()"
+            aria-label="Fermer la modale"
+            class="rounded-lg p-1.5 text-slate-400 transition hover:bg-emerald-900/50 hover:text-slate-100"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+
+        <!-- Formulaire -->
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <div class="max-h-[60vh] overflow-y-auto px-6 py-5">
+            @if (referenceError(); as error) {
+              <p
+                role="alert"
+                class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              >
+                {{ error }}
+              </p>
+            }
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <!-- Nom -->
+              <div class="sm:col-span-2">
+                <label
+                  for="product-name"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Nom
+                </label>
+                <input
+                  id="product-name"
+                  #nameInput
+                  type="text"
+                  formControlName="name"
+                  placeholder="Marteau 500 g"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.name); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- SKU -->
+              <div>
+                <label
+                  for="product-sku"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  SKU
+                </label>
+                <input
+                  id="product-sku"
+                  type="text"
+                  formControlName="sku"
+                  placeholder="PRD-0006"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.sku); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Categorie -->
+              <div>
+                <label
+                  for="product-category"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Catégorie
+                </label>
+                <select
+                  id="product-category"
+                  formControlName="category_id"
+                  [disabled]="referenceLoading()"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
+                >
+                  <option [ngValue]="null">Choisir une catégorie…</option>
+                  @for (category of categoryOptions(); track category.id) {
+                    <option [ngValue]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+                @if (errorFor(form.controls.category_id); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Unite -->
+              <div>
+                <label
+                  for="product-unit"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Unité
+                </label>
+                <select
+                  id="product-unit"
+                  formControlName="unit_id"
+                  [disabled]="referenceLoading()"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none disabled:opacity-60"
+                >
+                  <option [ngValue]="null">Choisir une unité…</option>
+                  @for (unit of unitOptions(); track unit.id) {
+                    <option [ngValue]="unit.id">{{ unit.name }} ({{ unit.symbol }})</option>
+                  }
+                </select>
+                @if (errorFor(form.controls.unit_id); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Prix d'achat -->
+              <div>
+                <label
+                  for="product-purchase-price"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Prix d'achat
+                </label>
+                <input
+                  id="product-purchase-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  formControlName="purchase_price"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.purchase_price); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Prix de vente -->
+              <div>
+                <label
+                  for="product-sale-price"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Prix de vente
+                </label>
+                <input
+                  id="product-sale-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  formControlName="sale_price"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.sale_price); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Quantite en stock -->
+              <div>
+                <label
+                  for="product-stock"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Quantité en stock
+                </label>
+                <input
+                  id="product-stock"
+                  type="number"
+                  step="1"
+                  min="0"
+                  formControlName="stock_quantity"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.stock_quantity); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Seuil d'alerte -->
+              <div>
+                <label
+                  for="product-alert"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Alerte de stock
+                </label>
+                <input
+                  id="product-alert"
+                  type="number"
+                  step="1"
+                  min="0"
+                  formControlName="min_stock_alert"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.min_stock_alert); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+            </div>
+
+            <!-- Erreur globale du formulaire -->
+            @if (formError(); as error) {
+              <p
+                role="alert"
+                class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              >
+                {{ error }}
+              </p>
+            }
+          </div>
+
+          <!-- Actions -->
+          <footer
+            class="flex flex-wrap items-center justify-end gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+          >
+            <button
+              type="button"
+              (click)="closeModal()"
+              class="rounded-lg border border-emerald-800/60 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/40"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              @if (submitting()) {
+                Création…
+              } @else {
+                Créer le produit
+              }
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+</div>

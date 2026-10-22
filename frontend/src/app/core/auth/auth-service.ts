@@ -1,5 +1,5 @@
 import { Service, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { AuthApi } from './auth-api';
 import { AuthUser, LoginCredentials, LoginResponse } from './auth.model';
 
@@ -7,8 +7,8 @@ import { AuthUser, LoginCredentials, LoginResponse } from './auth.model';
  * Cle de stockage du jeton d'authentification.
  *
  * NOTE SECURITE : le jeton est stocke dans `localStorage`, ce qui l'expose a
- * une éventuelle XSS. Le cookie `HttpOnly` serait plus sûr mais impose
- * `supports_credentials => true` côté CORS, ce qui n'est pas possible ici
+ * une eventuelle XSS. Le cookie `HttpOnly` serait plus sur mais impose
+ * `supports_credentials => true` cote CORS, ce qui n'est pas possible ici
  * (le frontend et l'API sont sur des origines distinctes en developpement).
  * A arbitrer lors du passage en production.
  */
@@ -55,14 +55,14 @@ function toAuthUser(partial: LoginResponse['user']): AuthUser {
 }
 
 /**
- * Etat d'authentification de l'application, gere par signaux.
+ * Service d'authentification : source de verite unique de l'application.
  *
- * `AuthStore` est la source de verite unique : l'intercepteur HTTP lit le
- * jeton ici, les guards lisent `isAuthenticated()` ici, et les composants
- * lisent `user()`, `roles()`, `permissions()`.
+ * L'intercepteur HTTP lit le jeton ici, les guards lisent
+ * `isAuthenticated()` ici, et les composants lisent `user()`, `roles()` et
+ * `permissions()`.
  */
 @Service()
-export class AuthStore {
+export class AuthService {
   private readonly api = inject(AuthApi);
 
   private readonly _token = signal<string | null>(readStoredToken());
@@ -114,9 +114,37 @@ export class AuthStore {
   }
 
   /**
+   * Tente une connexion et emet la reponse brute de `POST /api/login`.
+   *
+   * L'echec est signale par le canal `error` de l'Observable : Laravel
+   * repond en HTTP 422 avec `{ message, errors: { email: [message] } }`.
+   *
+   * Le jeton n'est PAS enregistre ici : c'est le role de `saveToken()`, ce qui
+   * laisse au composant le controle de ce qu'il fait de la reponse.
+   */
+  login(email: string, password: string): Observable<LoginResponse> {
+    this._status.set('authenticating');
+    return this.api.login({ email, password });
+  }
+
+  /**
+   * Enregistre le jeton renvoye par `login()`.
+   *
+   * Le jeton est ecrit dans `localStorage` : il sera relu au demarrage de
+   * l'application et injecte par l'intercepteur HTTP dans l'en-tete
+   * `Authorization`.
+   */
+  saveToken(token: string): void {
+    this._token.set(token);
+    writeStoredToken(token);
+    this._status.set('authenticated');
+  }
+
+  /**
    * Connecte l'utilisateur et persiste le jeton.
    *
-   * Apres `POST /api/login`, on appelle `GET /api/me` pour obtenir le profil
+   * Variante complete de `login()` + `saveToken()` : apres
+   * `POST /api/login`, on appelle `GET /api/me` pour obtenir le profil
    * complet (`id`, `is_active`, `permissions`). Si cet appel echoue, on
    * conserve le profil minimal renvoye par le login plutot que de faire
    * echouer la connexion.
@@ -125,19 +153,16 @@ export class AuthStore {
     this._status.set('authenticating');
 
     try {
-      const response = await firstValueFrom(this.api.login(credentials));
+      const response = await firstValueFrom(this.login(credentials.email, credentials.password));
 
-      this._token.set(response.token);
-      writeStoredToken(response.token);
+      this.saveToken(response.token);
 
       const user = await this.refreshProfile().catch(() => toAuthUser(response.user));
       this._user.set(user);
-      this._status.set('authenticated');
 
       return user;
     } catch (error) {
       this.clear();
-      this._status.set('anonymous');
       throw error;
     }
   }
@@ -163,7 +188,6 @@ export class AuthStore {
       // jeton local pour ne pas laisser une session fantome active.
     } finally {
       this.clear();
-      this._status.set('anonymous');
     }
   }
 
@@ -171,6 +195,7 @@ export class AuthStore {
   clear(): void {
     this._token.set(null);
     this._user.set(null);
+    this._status.set('anonymous');
     removeStoredToken();
   }
 }

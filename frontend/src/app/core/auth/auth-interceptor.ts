@@ -2,17 +2,17 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { AuthStore } from './auth-store';
+import { AuthService } from './auth-service';
 
 /**
  * Ajoute le jeton Bearer a toutes les requetes sortantes, sauf la connexion.
  *
- * Le jeton est lu depuis `AuthStore` a chaque requete : pas de copie locale,
- * donc pas de desynchronisation possible avec le store.
+ * Le jeton est lu depuis `AuthService` a chaque requete : pas de copie locale,
+ * donc pas de desynchronisation possible avec le service.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const store = inject(AuthStore);
-  const token = store.token();
+  const auth = inject(AuthService);
+  const token = auth.token();
 
   if (!token || isLoginEndpoint(req.url)) {
     return next(req);
@@ -29,13 +29,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
  * declenche l'appel peut ainsi afficher un message contextualise.
  */
 export const unauthorizedInterceptor: HttpInterceptorFn = (req, next) => {
-  const store = inject(AuthStore);
+  const auth = inject(AuthService);
   const router = inject(Router);
 
   return next(req).pipe(
     catchError((error: unknown) => {
       if (error instanceof HttpErrorResponse && error.status === 401 && !isLoginEndpoint(req.url)) {
-        store.clear();
+        auth.clear();
         void router.navigate(['/login'], { queryParams: { redirectUrl: router.url } });
       }
 

@@ -1,0 +1,20 @@
+:host {
+  display: contents;
+}
+
+/* Apparition des notifications. */
+.toast-enter {
+  animation: toast-in 200ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

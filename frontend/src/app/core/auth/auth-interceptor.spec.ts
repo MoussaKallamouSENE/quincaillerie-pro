@@ -1,14 +1,14 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+﻿import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { AuthStore } from './auth-store';
+import { AuthService } from './auth-service';
 import { authInterceptor, unauthorizedInterceptor } from './auth-interceptor';
 
 describe('authInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
-  let store: AuthStore;
+  let store: AuthService;
   let router: { navigate: ReturnType<typeof vi.fn>; url: string };
 
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('authInterceptor', () => {
 
     http = TestBed.inject(HttpClient);
     httpMock = TestBed.inject(HttpTestingController);
-    store = TestBed.inject(AuthStore);
+    store = TestBed.inject(AuthService);
   });
 
   afterEach(() => {

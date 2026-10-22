@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales', [SaleController::class, 'index']);
     Route::post('/sales', [SaleController::class, 'store']);
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale');
+    Route::get('/sales/{sale}/invoice', [SaleController::class, 'downloadInvoice'])->whereNumber('sale');
 
     // Listes de référence du catalogue, utilisées par le formulaire produit.
     Route::get('/categories', [CategoryController::class, 'index']);

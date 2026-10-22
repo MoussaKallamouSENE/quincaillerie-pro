@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSaleRequest;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
 use App\Services\SaleService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +70,24 @@ class SaleController extends Controller
             ->findOrFail($sale);
 
         return SaleResource::make($model)->response();
+    }
+
+    /**
+     * Download the sale invoice as a PDF.
+     *
+     * The customer, the seller, the lines with their product and the payments
+     * are loaded with the sale, so that the invoice can be printed as a single
+     * document.
+     */
+    public function downloadInvoice(int $sale): Response
+    {
+        $model = Sale::query()
+            ->with(['customer', 'user', 'items.product', 'payments'])
+            ->findOrFail($sale);
+
+        return Pdf::loadView('pdf.invoice', ['sale' => $model])
+            ->setPaper('a4', 'portrait')
+            ->download('facture-'.$model->reference.'.pdf');
     }
 
     /**

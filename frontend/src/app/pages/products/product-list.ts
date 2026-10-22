@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AuthService } from '../../core/auth/auth-service';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { ToastService } from '../../core/toast/toast-service';
 import { ProductService } from '../../services/product-service';
@@ -52,11 +53,20 @@ export class ProductList {
   private readonly productService = inject(ProductService);
   private readonly referenceService = inject(ReferenceService);
   private readonly toastService = inject(ToastService);
+  private readonly auth = inject(AuthService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Terme de recherche saisi dans la barre de recherche. */
   protected readonly searchTerm = signal('');
+
+  /**
+   * Vrai si l'utilisateur peut consulter les prix d'achat.
+   *
+   * Les prix d'achat sont reserves aux administrateurs et aux gerants : un
+   * employe ne doit pas connaitre le cout de la marchandise.
+   */
+  protected readonly canSeePurchasePrice = computed(() => this.auth.hasRole('Admin', 'Gérant'));
 
   /** Catalogue complet des produits. */
   protected readonly products = httpResource<ProductsPage>(() =>

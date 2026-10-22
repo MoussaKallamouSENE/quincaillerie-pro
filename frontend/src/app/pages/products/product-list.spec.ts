@@ -1,10 +1,11 @@
 import { registerLocaleData } from '@angular/common';
 import { provideHttpClient, HttpRequest } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { LOCALE_ID } from '@angular/core';
+import { LOCALE_ID, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import localeFr from '@angular/common/locales/fr';
+import { AuthService } from '../../core/auth/auth-service';
 import { ToastService } from '../../core/toast/toast-service';
 import type { Product, ProductsPage } from '../../services/product.model';
 import { ProductList } from './product-list';
@@ -75,6 +76,13 @@ describe('ProductList', () => {
   let fixture: ComponentFixture<ProductList>;
   let httpMock: HttpTestingController;
   let toastService: ToastService;
+
+  /** Roles du faux utilisateur connecte. */
+  const roles = signal<string[]>(['Admin']);
+
+  const authMock = {
+    hasRole: (...allowed: string[]) => allowed.some((role) => roles().includes(role)),
+  };
 
   /** Requete du catalogue produits. */
   const isCatalogRequest = (request: HttpRequest<unknown>) => request.url.endsWith('/api/products');
@@ -193,6 +201,8 @@ describe('ProductList', () => {
   }
 
   beforeEach(async () => {
+    roles.set(['Admin']);
+
     await TestBed.configureTestingModule({
       imports: [ProductList],
       providers: [
@@ -200,6 +210,7 @@ describe('ProductList', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: LOCALE_ID, useValue: 'fr-FR' },
+        { provide: AuthService, useValue: authMock },
       ],
     }).compileComponents();
 
@@ -260,6 +271,23 @@ describe('ProductList', () => {
     expect(text).toContain('45 000,00');
     expect(text).toContain('67 500,00');
     expect(text).toContain('40');
+  });
+
+  it('should hide the purchase price from an employee', async () => {
+    roles.set(['Employé']);
+    fixture.detectChanges();
+
+    await flushProducts([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+    const text = normalizeSpaces(element.textContent ?? '');
+    const headers = Array.from(element.querySelectorAll('thead th')).map((header) =>
+      header.textContent?.trim(),
+    );
+
+    expect(headers).not.toContain("Prix d'achat");
+    expect(text).not.toContain('45 000,00');
+    expect(text).toContain('67 500,00');
   });
 
   it('should display the stock in red when it reaches the alert threshold', async () => {

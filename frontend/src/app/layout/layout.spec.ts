@@ -97,11 +97,11 @@ describe('Layout', () => {
     expect(usersLink()).toBeDefined();
   });
 
-  it('should show the users entry when the permission is granted', () => {
+  it('should hide the users entry from an employee even with the permission', () => {
     roles.set(['Employé']);
     permissions.set(['gerer_utilisateurs']);
     fixture.detectChanges();
 
-    expect(usersLink()).toBeDefined();
+    expect(usersLink()).toBeUndefined();
   });
 });

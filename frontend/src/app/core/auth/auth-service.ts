@@ -42,6 +42,21 @@ function removeStoredToken(): void {
   }
 }
 
+/**
+ * Minuscule sans accents, pour comparer des roles ignores la casse.
+ *
+ * Les roles sont stockes avec leur libelle d'affichage (`Admin`, `Gérant`,
+ * `Employé`) : cette normalisation permet d'appeler `hasRole('gerant')` sans
+ * dependre des accents ou de la casse.
+ */
+function normalizeRole(role: string): string {
+  return role
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
 /** Reconstruit un `AuthUser` a partir de la reponse partielle de `/api/login`. */
 function toAuthUser(partial: LoginResponse['user']): AuthUser {
   return {
@@ -81,7 +96,7 @@ export class AuthService {
   /** Vrai des qu'un jeton est disponible. */
   readonly isAuthenticated = computed(() => this._token() !== null);
 
-  /** Roles de l'utilisateur connecte (`Admin`, `Gerant`, `Employe`). */
+  /** Roles de l'utilisateur connecte (`Admin`, `Gérant`, `Employé`). */
   readonly roles = computed(() => this._user()?.roles ?? []);
 
   /** Permissions Spatie de l'utilisateur connecte. */
@@ -103,9 +118,16 @@ export class AuthService {
       .join('');
   });
 
-  /** Vrai si l'utilisateur possede au moins un des roles donnes. */
+  /**
+   * Vrai si l'utilisateur possede au moins un des roles donnes.
+   *
+   * La comparaison ignore la casse et les accents : `hasRole('gerant')`
+   * reconnait le role `Gérant`.
+   */
   hasRole(...roles: string[]): boolean {
-    return roles.some((role) => this.roles().includes(role));
+    const currentRoles = this.roles().map(normalizeRole);
+
+    return roles.some((role) => currentRoles.includes(normalizeRole(role)));
   }
 
   /** Vrai si l'utilisateur possede au moins une des permissions donnees. */

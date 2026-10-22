@@ -6,9 +6,11 @@ import {
   UrlTree,
   provideRouter,
 } from '@angular/router';
+import { ToastService } from '../toast/toast-service';
 import { AuthApi } from './auth-api';
 import { AuthService } from './auth-service';
-import { authGuard, guestGuard, permissionOrRoleGuard, roleGuard } from './auth-guard';
+import { authGuard, guestGuard, permissionOrRoleGuard } from './auth-guard';
+import { roleGuard } from './role.guard';
 import { of } from 'rxjs';
 import type { LoginResponse, MeResponse } from './auth.model';
 
@@ -92,11 +94,40 @@ describe('authGuard', () => {
   it('should enforce the allowed roles', async () => {
     await store.signIn({ email: 'a@b.c', password: 'x' });
 
-    const allowed = TestBed.runInInjectionContext(() => roleGuard(['Admin'])(route, state));
-    const denied = TestBed.runInInjectionContext(() => roleGuard(['Gerant'])(route, state));
+    const allowed = await TestBed.runInInjectionContext(() => roleGuard('Admin')(route, state));
+    const denied = await TestBed.runInInjectionContext(() => roleGuard('Gérant')(route, state));
 
     expect(allowed).toBe(true);
     expect(denied).toBeInstanceOf(UrlTree);
+  });
+
+  it('should compare roles regardless of case and accents', async () => {
+    await store.signIn({ email: 'a@b.c', password: 'x' });
+
+    const result = await TestBed.runInInjectionContext(() => roleGuard('admin')(route, state));
+
+    expect(result).toBe(true);
+  });
+
+  it('should show an error message and redirect a user without the role', async () => {
+    await store.signIn({ email: 'a@b.c', password: 'x' });
+    const toastService = TestBed.inject(ToastService);
+
+    const result = await TestBed.runInInjectionContext(() => roleGuard('Gérant')(route, state));
+
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(router.serializeUrl(result as UrlTree)).toContain('/dashboard');
+    expect(toastService.toasts()[0]?.message).toContain('Accès refusé');
+  });
+
+  it('should load the profile before checking a role', async () => {
+    // Jeton restaure mais profil pas encore charge (rechargement direct).
+    store.saveToken('token-abc');
+
+    const result = await TestBed.runInInjectionContext(() => roleGuard('Admin')(route, state));
+
+    expect(store.user()?.roles).toContain('Admin');
+    expect(result).toBe(true);
   });
 
   it('should allow a user holding one of the required roles', async () => {

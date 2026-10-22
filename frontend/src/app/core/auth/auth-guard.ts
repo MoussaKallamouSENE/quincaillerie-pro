@@ -37,26 +37,6 @@ export const guestGuard: CanActivateFn = () => {
 };
 
 /**
- * Restreint une route a certains roles.
- *
- * Usage : `{ path: 'users', canActivate: [roleGuard(['Admin'])] }`
- *
- * Le controle reel reste assure par le serveur.
- */
-export function roleGuard(allowedRoles: string[]): CanActivateFn {
-  return (_route, state) => {
-    const auth = inject(AuthService);
-    const router = inject(Router);
-
-    if (auth.hasRole(...allowedRoles)) {
-      return true;
-    }
-
-    return router.createUrlTree(['/dashboard'], { queryParams: { denied: state.url } });
-  };
-}
-
-/**
  * Restreint une route a une permission Spatie ou a certains roles.
  *
  * Usage : `permissionOrRoleGuard('gerer_utilisateurs', ['Admin', 'Gérant'])`

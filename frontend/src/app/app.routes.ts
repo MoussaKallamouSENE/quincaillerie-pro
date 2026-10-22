@@ -26,9 +26,30 @@ export const routes: Routes = [
         title: 'Tableau de bord - Quincaillerie Pro',
       },
       {
+        path: 'pos',
+        loadComponent: () => import('./pages/pos/pos').then((m) => m.Pos),
+        title: 'Caisse - Quincaillerie Pro',
+      },
+      {
+        path: 'sales',
+        loadComponent: () =>
+          import('./pages/sales/sale-list.component').then((m) => m.SaleListComponent),
+        title: 'Historique des ventes - Quincaillerie Pro',
+      },
+      {
         path: 'products',
         loadComponent: () => import('./pages/products/product-list').then((m) => m.ProductList),
         title: 'Produits - Quincaillerie Pro',
+      },
+      {
+        path: 'customers',
+        loadComponent: () => import('./pages/customers/customer-list').then((m) => m.CustomerList),
+        title: 'Clients - Quincaillerie Pro',
+      },
+      {
+        path: 'suppliers',
+        loadComponent: () => import('./pages/suppliers/supplier-list').then((m) => m.SupplierList),
+        title: 'Fournisseurs - Quincaillerie Pro',
       },
     ],
   },

@@ -1,0 +1,675 @@
+<div class="flex min-h-[calc(100vh-7rem)] flex-col gap-5">
+  <!-- En-tete -->
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Caisse</h1>
+      <p class="mt-1 text-sm text-slate-400">Encaissez les ventes du magasin</p>
+    </div>
+
+    @if (cashSession(); as session) {
+      <div class="flex flex-wrap items-center gap-3">
+        <div
+          class="rounded-xl border border-emerald-800/50 bg-[#153322] px-4 py-2 shadow-lg shadow-emerald-950/20"
+        >
+          <p class="text-[11px] tracking-wide text-emerald-400/80 uppercase">Caisse ouverte</p>
+          <p class="text-sm font-semibold text-slate-100">
+            Fond {{ session.opening_balance | number: '1.2-2' }} · Théorique
+            {{ session.expected_cash | number: '1.2-2' }} FCFA
+          </p>
+        </div>
+
+        <button
+          type="button"
+          (click)="onOpenClosing()"
+          class="inline-flex items-center gap-2 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300"
+        >
+          <svg
+            class="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Clôturer la caisse
+        </button>
+      </div>
+    }
+  </header>
+
+  <!-- Corps : catalogue a gauche, panier a droite -->
+  <div class="grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <!-- Catalogue -->
+    <section class="flex min-w-0 flex-col gap-4">
+      <!-- Recherche -->
+      <div class="relative">
+        <svg
+          class="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-slate-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+          />
+        </svg>
+        <input
+          type="search"
+          [value]="searchTerm()"
+          (input)="onSearch($event)"
+          placeholder="Rechercher un produit par nom ou SKU…"
+          aria-label="Rechercher un produit par nom ou SKU"
+          class="w-full rounded-xl border border-emerald-800/50 bg-[#153322] py-3 pr-4 pl-12 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <!-- Erreur de session -->
+      @if (sessionError(); as error) {
+        <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center" role="alert">
+          <p class="text-sm font-medium text-red-300">{{ error }}</p>
+          <button
+            type="button"
+            (click)="onRetrySession()"
+            class="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
+          >
+            Réessayer
+          </button>
+        </div>
+      } @else if (productsLoading()) {
+        <!-- Chargement -->
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+          @for (placeholder of [1, 2, 3, 4, 5, 6]; track placeholder) {
+            <div
+              class="h-28 animate-pulse rounded-xl border border-emerald-800/40 bg-[#153322]"
+            ></div>
+          }
+        </div>
+      } @else if (productsError(); as error) {
+        <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center" role="alert">
+          <p class="text-sm font-medium text-red-300">{{ error }}</p>
+        </div>
+      } @else if (isEmptySearch()) {
+        <div
+          class="rounded-xl border border-dashed border-emerald-800/60 bg-[#153322]/50 p-10 text-center"
+        >
+          <p class="text-sm font-medium text-slate-300">Aucun produit trouvé</p>
+          <p class="mt-1 text-sm text-slate-500">Essayez un autre nom ou une autre référence.</p>
+          <button
+            type="button"
+            (click)="clearSearch()"
+            class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-sm font-medium text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+          >
+            Effacer la recherche
+          </button>
+        </div>
+      } @else {
+        <!-- Resultats -->
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          @for (product of filteredProducts(); track product.id) {
+            <button
+              type="button"
+              (click)="addToCart(product)"
+              [disabled]="product.stock_quantity <= 0"
+              class="group flex flex-col justify-between gap-3 rounded-xl border border-emerald-800/50 bg-[#153322] p-4 text-left transition hover:border-emerald-500/70 hover:bg-[#19402a] focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-emerald-800/50 disabled:hover:bg-[#153322]"
+            >
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-100 group-hover:text-white">
+                  {{ product.name }}
+                </span>
+                <span class="mt-1 block text-xs text-slate-500">{{ product.sku }}</span>
+              </span>
+
+              <span class="flex items-end justify-between gap-2">
+                <span class="text-base font-bold text-emerald-400">
+                  {{ product.sale_price | number: '1.2-2' }}
+                  <span class="text-[11px] font-normal text-slate-500">FCFA</span>
+                </span>
+
+                @if (product.stock_quantity <= 0) {
+                  <span
+                    class="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300"
+                  >
+                    Rupture
+                  </span>
+                } @else {
+                  <span
+                    class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+                  >
+                    {{ product.stock_quantity }} en stock
+                  </span>
+                }
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Panier -->
+    <aside
+      class="flex flex-col gap-4 rounded-xl border border-emerald-800/50 bg-[#153322] p-4 shadow-lg shadow-emerald-950/30 xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)]"
+    >
+      <!-- En-tete du panier -->
+      <div class="flex items-center justify-between gap-2">
+        <h2
+          class="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-200 uppercase"
+        >
+          Panier
+          <span
+            class="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300"
+          >
+            {{ cartCount() }}
+          </span>
+        </h2>
+
+        @if (cart().length > 0) {
+          <button
+            type="button"
+            (click)="clearCart()"
+            class="text-xs font-medium text-slate-400 transition hover:text-red-300"
+          >
+            Vider le panier
+          </button>
+        }
+      </div>
+
+      <!-- Lignes -->
+      <div class="min-h-24 flex-1 space-y-2 overflow-y-auto xl:max-h-64">
+        @if (cart().length === 0) {
+          <div
+            class="flex h-full min-h-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-800/60 px-4 py-8 text-center"
+          >
+            <svg
+              class="h-8 w-8 text-emerald-800"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
+              />
+            </svg>
+            <p class="text-sm text-slate-500">
+              Le panier est vide. Cliquez sur un produit pour l’ajouter.
+            </p>
+          </div>
+        }
+
+        @for (line of cart(); track line.product.id) {
+          <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/30 p-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-slate-100">
+                  {{ line.product.name }}
+                </p>
+                <p class="mt-0.5 text-xs text-slate-500">
+                  {{ line.product.sku }} · {{ line.unitPrice | number: '1.2-2' }} FCFA
+                </p>
+              </div>
+
+              <button
+                type="button"
+                (click)="removeFromCart(line)"
+                class="shrink-0 rounded-md p-1 text-slate-500 transition hover:bg-red-500/10 hover:text-red-300"
+                [attr.aria-label]="'Retirer ' + line.product.name + ' du panier'"
+              >
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="mt-2.5 flex items-center justify-between gap-2">
+              <!-- Quantite -->
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  (click)="decrement(line)"
+                  class="flex h-7 w-7 items-center justify-center rounded-md border border-emerald-800/60 text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300"
+                  [attr.aria-label]="'Retirer une unité de ' + line.product.name"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+                  </svg>
+                </button>
+
+                <span class="w-8 text-center text-sm font-semibold text-slate-100">
+                  {{ line.quantity }}
+                </span>
+
+                <button
+                  type="button"
+                  (click)="increment(line)"
+                  class="flex h-7 w-7 items-center justify-center rounded-md border border-emerald-800/60 text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300"
+                  [attr.aria-label]="'Ajouter une unité de ' + line.product.name"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M12 4.5v15m7.5-7.5h-15"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <span class="text-sm font-semibold text-slate-100">
+                {{ line.unitPrice * line.quantity | number: '1.2-2' }}
+                <span class="text-[11px] font-normal text-slate-500">FCFA</span>
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Total -->
+      <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-3.5 py-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-400">Total général</span>
+          <span class="text-xl font-bold text-emerald-300" aria-live="polite">
+            {{ cartTotal() | number: '1.2-2' }}
+            <span class="text-xs font-normal text-slate-500">FCFA</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Client et reglement -->
+      <div class="space-y-3 border-t border-emerald-900/60 pt-3">
+        <!-- Client -->
+        <div>
+          <label
+            for="pos-customer"
+            class="mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase"
+          >
+            Client (optionnel)
+          </label>
+          <select
+            id="pos-customer"
+            [value]="selectedCustomerId() ?? ''"
+            (change)="onSelectCustomer($event)"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          >
+            <option value="">Aucun client (vente comptant)</option>
+            @for (customer of customers.value()?.data ?? []; track customer.id) {
+              <option [value]="customer.id">{{ customer.name }}</option>
+            }
+          </select>
+
+          @if (selectedCustomer(); as customer) {
+            <p class="mt-1.5 text-xs text-slate-500">
+              Dette en cours : {{ customer.outstanding_balance | number: '1.2-2' }} FCFA
+            </p>
+          }
+        </div>
+
+        <!-- Mode de paiement -->
+        <div>
+          <span class="mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            Mode de paiement
+          </span>
+          <div class="grid grid-cols-2 gap-2">
+            @for (option of paymentOptions; track option.method) {
+              <button
+                type="button"
+                (click)="onSelectPaymentMethod(option.method)"
+                [class]="
+                  paymentMethod() === option.method
+                    ? 'rounded-lg border border-emerald-400 bg-emerald-500 px-3 py-2 text-sm font-semibold text-white transition'
+                    : 'rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-600 hover:text-emerald-200'
+                "
+              >
+                {{ option.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Montant recu -->
+        @if (paymentMethod() !== 'credit') {
+          <div>
+            <label
+              for="pos-received"
+              class="mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase"
+            >
+              Montant reçu
+            </label>
+            <div class="relative">
+              <input
+                id="pos-received"
+                type="number"
+                min="0"
+                step="any"
+                inputmode="decimal"
+                [value]="receivedAmount()"
+                (input)="onReceivedAmount($event)"
+                class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-16 pl-3 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+              <span
+                class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-500"
+              >
+                FCFA
+              </span>
+            </div>
+
+            @if (changeDue() > 0) {
+              <p class="mt-1.5 text-xs font-medium text-emerald-300">
+                Monnaie à rendre : {{ changeDue() | number: '1.2-2' }} FCFA
+              </p>
+            }
+
+            @if (dueAmount() > 0) {
+              <p class="mt-1.5 text-xs font-medium text-amber-300">
+                Reste dû : {{ dueAmount() | number: '1.2-2' }} FCFA
+              </p>
+            }
+          </div>
+        } @else {
+          <p
+            class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+          >
+            La totalité de la vente sera reportée sur la dette du client.
+          </p>
+        }
+      </div>
+
+      <!-- Erreur -->
+      @if (saleError(); as error) {
+        <p
+          class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+          role="alert"
+        >
+          {{ error }}
+        </p>
+      }
+
+      <!-- Validation -->
+      <button
+        type="button"
+        (click)="onValidateSale()"
+        [disabled]="submitting() || cart().length === 0"
+        class="w-full rounded-xl bg-emerald-500 py-4 text-base font-bold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-emerald-500/40 disabled:text-slate-300 disabled:shadow-none"
+      >
+        {{ submitting() ? 'Enregistrement…' : 'Valider la vente' }}
+      </button>
+    </aside>
+  </div>
+</div>
+
+<!-- Modale bloquante : ouverture de la caisse -->
+@if (needsOpening()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-opening-title"
+      class="w-full max-w-md rounded-2xl border border-emerald-800/60 bg-[#10261c] p-6 shadow-2xl shadow-black/60"
+    >
+      <div class="flex items-start gap-3">
+        <span
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
+            />
+          </svg>
+        </span>
+
+        <div>
+          <h2 id="pos-opening-title" class="text-lg font-semibold text-slate-100">
+            Ouvrir la caisse
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">
+            Saisissez le fond de caisse pour commencer à vendre.
+          </p>
+        </div>
+      </div>
+
+      <form class="mt-6" [formGroup]="openingForm" (ngSubmit)="onOpenSession()">
+        <label for="pos-opening-balance" class="mb-1.5 block text-sm font-medium text-slate-300">
+          Fond de caisse initial
+        </label>
+
+        <div class="relative">
+          <input
+            #openingInput
+            id="pos-opening-balance"
+            type="number"
+            min="0"
+            step="any"
+            inputmode="decimal"
+            formControlName="opening_balance"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/50 py-2.5 pr-16 pl-3 text-lg font-semibold text-slate-100 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          />
+          <span
+            class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500"
+          >
+            FCFA
+          </span>
+        </div>
+
+        @if (errorFor(openingForm.controls.opening_balance); as error) {
+          <p class="mt-1.5 text-sm text-red-400">{{ error }}</p>
+        }
+
+        @if (openingError(); as error) {
+          <p
+            class="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+            role="alert"
+          >
+            {{ error }}
+          </p>
+        }
+
+        <button
+          type="submit"
+          [disabled]="openingSubmitting()"
+          class="mt-5 w-full rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {{ openingSubmitting() ? 'Ouverture…' : 'Ouvrir la caisse' }}
+        </button>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Modale : cloture de la caisse -->
+@if (closingModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+    (click)="onCancelClosing()"
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-closing-title"
+      class="w-full max-w-md rounded-2xl border border-emerald-800/60 bg-[#10261c] p-6 shadow-2xl shadow-black/60"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 id="pos-closing-title" class="text-lg font-semibold text-slate-100">
+        Clôturer la caisse
+      </h2>
+      <p class="mt-1 text-sm text-slate-400">
+        Comptez les espèces du tiroir et saisissez le montant total.
+      </p>
+
+      <form class="mt-5" [formGroup]="closingForm" (ngSubmit)="onCloseSession()">
+        <dl class="mb-4 space-y-2 rounded-lg bg-emerald-950/40 px-3.5 py-3 text-sm">
+          <div class="flex items-center justify-between">
+            <dt class="text-slate-400">Ventes en espèces de la session</dt>
+            <dd class="font-semibold text-slate-100">
+              {{ cashSession()?.cash_received | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt class="text-slate-400">Dépenses</dt>
+            <dd class="text-slate-300">
+              −{{ cashSession()?.expenses_total | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
+          <div class="flex items-center justify-between border-t border-emerald-900/60 pt-2">
+            <dt class="text-slate-400">Solde théorique</dt>
+            <dd class="font-semibold text-emerald-300">
+              {{ cashSession()?.expected_cash | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
+        </dl>
+
+        <label for="pos-closing-balance" class="mb-1.5 block text-sm font-medium text-slate-300">
+          Montant compté en espèces
+        </label>
+
+        <div class="relative">
+          <input
+            id="pos-closing-balance"
+            type="number"
+            min="0"
+            step="any"
+            inputmode="decimal"
+            formControlName="closing_balance"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/50 py-2.5 pr-16 pl-3 text-lg font-semibold text-slate-100 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          />
+          <span
+            class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500"
+          >
+            FCFA
+          </span>
+        </div>
+
+        @if (errorFor(closingForm.controls.closing_balance); as error) {
+          <p class="mt-1.5 text-sm text-red-400">{{ error }}</p>
+        }
+
+        @if (closingError(); as error) {
+          <p
+            class="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+            role="alert"
+          >
+            {{ error }}
+          </p>
+        }
+
+        <div class="mt-5 flex gap-3">
+          <button
+            type="button"
+            (click)="onCancelClosing()"
+            class="flex-1 rounded-lg border border-emerald-800/60 px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            [disabled]="closingSubmitting()"
+            class="flex-1 rounded-lg bg-emerald-500 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ closingSubmitting() ? 'Clôture…' : 'Clôturer' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Modale : resume de la cloture -->
+@if (closingSummary(); as session) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-summary-title"
+      class="w-full max-w-md rounded-2xl border border-emerald-800/60 bg-[#10261c] p-6 shadow-2xl shadow-black/60"
+    >
+      <h2 id="pos-summary-title" class="text-lg font-semibold text-slate-100">Caisse clôturée</h2>
+      <p class="mt-1 text-sm text-slate-400">
+        La session de caisse est fermée. Comparez le comptage au théorique.
+      </p>
+
+      <dl class="mt-5 space-y-2 rounded-lg bg-emerald-950/40 p-4 text-sm">
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Fond de caisse</dt>
+          <dd class="font-medium text-slate-100">
+            {{ session.opening_balance | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Ventes en espèces</dt>
+          <dd class="font-medium text-slate-100">
+            {{ session.cash_received | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Dépenses</dt>
+          <dd class="font-medium text-slate-100">
+            −{{ session.expenses_total | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between border-t border-emerald-900/60 pt-2">
+          <dt class="text-slate-400">Solde théorique</dt>
+          <dd class="font-semibold text-slate-100">
+            {{ session.expected_cash | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Montant compté</dt>
+          <dd class="font-medium text-slate-100">
+            {{ session.closing_balance | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between border-t border-emerald-900/60 pt-2">
+          <dt class="text-slate-400">Écart</dt>
+          <dd class="font-bold" [class]="isSurplus(session) ? 'text-emerald-300' : 'text-red-300'">
+            {{ session.difference | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+      </dl>
+
+      <button
+        type="button"
+        (click)="onDismissClosingSummary()"
+        class="mt-5 w-full rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400"
+      >
+        Fermer
+      </button>
+    </div>
+  </div>
+}

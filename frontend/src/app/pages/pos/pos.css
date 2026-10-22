@@ -1,0 +1,17 @@
+:host {
+  display: block;
+}
+
+/* Barre de defilement discrete pour le panier. */
+aside ::-webkit-scrollbar {
+  width: 6px;
+}
+
+aside ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+aside ::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: rgb(16 185 129 / 25%);
+}

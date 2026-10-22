@@ -1,0 +1,415 @@
+<div>
+  <!-- Titre + actions -->
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Clients</h1>
+      <p class="mt-1 text-sm text-slate-400">Gérez le fichier de vos clients et leurs dettes</p>
+    </div>
+
+    <button
+      type="button"
+      (click)="onCreateCustomer()"
+      class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+    >
+      <svg
+        class="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-hidden="true"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Nouveau Client
+    </button>
+  </div>
+
+  <!-- Fichier clients -->
+  <section
+    class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+    >
+      <!-- Recherche -->
+      <div class="relative w-full max-w-sm">
+        <svg
+          class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+          />
+        </svg>
+        <input
+          type="search"
+          placeholder="Rechercher un client par nom…"
+          aria-label="Rechercher un client par nom"
+          [value]="searchTerm()"
+          (input)="onSearch($event)"
+          class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-3 pl-10 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <p class="text-sm text-slate-400">
+        <span class="font-semibold text-slate-200">{{ resultCount() }}</span>
+        @if (resultCount() > 1) {
+          clients
+        } @else {
+          client
+        }
+        @if (searchTerm().trim()) {
+          sur {{ totalCount() }}
+        }
+      </p>
+    </header>
+
+    @if (customers.isLoading()) {
+      <!-- Chargement -->
+      <p class="sr-only" role="status">Chargement des clients…</p>
+      <div class="overflow-x-auto" aria-hidden="true">
+        <table class="w-full min-w-[720px] text-left text-sm">
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+              <tr>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-48 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-32 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-24 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-24 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (customers.error()) {
+      <!-- Erreur -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-red-400 ring-1 ring-red-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </span>
+        <p class="mt-4 text-sm font-medium text-red-300">Fichier clients indisponible</p>
+        <p class="mt-1 text-xs text-slate-400">{{ errorMessage() }}</p>
+        <button
+          type="button"
+          (click)="reload()"
+          class="mt-4 rounded-lg border border-red-500/40 px-3.5 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+        >
+          Réessayer
+        </button>
+      </div>
+    } @else if (filteredCustomers().length === 0) {
+      <!-- Fichier vide -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+            />
+          </svg>
+        </span>
+        @if (isEmptySearch()) {
+          <p class="mt-4 text-sm font-medium text-slate-200">
+            Aucun client ne correspond à « {{ searchTerm().trim() }} »
+          </p>
+          <p class="mt-1 text-xs text-slate-400">Essayez un autre terme de recherche.</p>
+          <button
+            type="button"
+            (click)="clearSearch()"
+            class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40"
+          >
+            Réinitialiser la recherche
+          </button>
+        } @else {
+          <p class="mt-4 text-sm font-medium text-slate-200">Aucun client enregistré</p>
+          <p class="mt-1 text-xs text-slate-400">
+            Créez votre premier client pour commencer à vendre.
+          </p>
+        }
+      </div>
+    } @else {
+      <!-- Tableau -->
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[720px] text-left text-sm">
+          <caption class="sr-only">
+            Fichier des clients
+          </caption>
+
+          <thead>
+            <tr
+              class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
+            >
+              <th scope="col" class="px-6 py-3 font-medium">Nom</th>
+              <th scope="col" class="px-6 py-3 font-medium">Téléphone</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Limite de crédit</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Dette actuelle</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (customer of filteredCustomers(); track customer.id) {
+              <tr class="transition hover:bg-emerald-900/30">
+                <td class="px-6 py-4 font-medium text-slate-100">{{ customer.name }}</td>
+                <td class="px-6 py-4 text-slate-400">
+                  {{ customer.phone ?? '—' }}
+                </td>
+                <td class="px-6 py-4 text-right text-slate-400">
+                  {{ customer.credit_limit | number: '1.2-2' }}
+                  <span class="text-xs text-slate-500">FCFA</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  @if (hasDebt(customer)) {
+                    <span class="font-semibold text-red-400">
+                      {{ customer.outstanding_balance | number: '1.2-2' }}
+                    </span>
+                  } @else {
+                    <span class="text-slate-200">
+                      {{ customer.outstanding_balance | number: '1.2-2' }}
+                    </span>
+                  }
+                  <span class="text-xs text-slate-500">FCFA</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- Modale de creation d'un client -->
+  @if (isModalOpen()) {
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      (click)="closeModal()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-customer-title"
+        class="my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-800/60 bg-[#153322] shadow-2xl shadow-emerald-950/60"
+        (click)="$event.stopPropagation()"
+      >
+        <!-- En-tete -->
+        <header
+          class="flex items-start justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+        >
+          <div>
+            <h2 id="create-customer-title" class="text-lg font-semibold text-slate-100">
+              Nouveau Client
+            </h2>
+            <p class="mt-1 text-xs text-slate-400">
+              Ajoutez un client à votre fichier de la quincaillerie.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            (click)="closeModal()"
+            aria-label="Fermer la modale"
+            class="rounded-lg p-1.5 text-slate-400 transition hover:bg-emerald-900/50 hover:text-slate-100"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+
+        <!-- Formulaire -->
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <div class="max-h-[60vh] overflow-y-auto px-6 py-5">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <!-- Nom -->
+              <div class="sm:col-span-2">
+                <label
+                  for="customer-name"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Nom
+                </label>
+                <input
+                  id="customer-name"
+                  #nameInput
+                  type="text"
+                  formControlName="name"
+                  placeholder="Client Passage"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.name); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Telephone -->
+              <div>
+                <label
+                  for="customer-phone"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Téléphone
+                </label>
+                <input
+                  id="customer-phone"
+                  type="tel"
+                  formControlName="phone"
+                  placeholder="+221 77 000 00 00"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.phone); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label
+                  for="customer-email"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Email
+                </label>
+                <input
+                  id="customer-email"
+                  type="email"
+                  formControlName="email"
+                  placeholder="client@example.sn"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.email); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Adresse -->
+              <div class="sm:col-span-2">
+                <label
+                  for="customer-address"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Adresse
+                </label>
+                <input
+                  id="customer-address"
+                  type="text"
+                  formControlName="address"
+                  placeholder="Dakar Plateau, rue Sandiniery"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.address); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Limite de credit -->
+              <div>
+                <label
+                  for="customer-credit-limit"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Limite de crédit
+                </label>
+                <input
+                  id="customer-credit-limit"
+                  type="number"
+                  step="1"
+                  min="0"
+                  formControlName="credit_limit"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.credit_limit); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+            </div>
+
+            <!-- Erreur globale du formulaire -->
+            @if (formError(); as error) {
+              <p
+                role="alert"
+                class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              >
+                {{ error }}
+              </p>
+            }
+          </div>
+
+          <!-- Actions -->
+          <footer
+            class="flex flex-wrap items-center justify-end gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+          >
+            <button
+              type="button"
+              (click)="closeModal()"
+              class="rounded-lg border border-emerald-800/60 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/40"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              @if (submitting()) {
+                Création…
+              } @else {
+                Créer le client
+              }
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+</div>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CashSessionController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SupplierController;
@@ -24,6 +25,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cash-sessions/open', [CashSessionController::class, 'open']);
     Route::post('/cash-sessions/close', [CashSessionController::class, 'close']);
     Route::get('/cash-sessions/current', [CashSessionController::class, 'current']);
+
+    // Dépenses : rattachées à la session de caisse ouverte de l'utilisateur.
+    Route::get('/expenses', [ExpenseController::class, 'index']);
+    Route::post('/expenses', [ExpenseController::class, 'store']);
 
     // Ventes : enregistrement transactionnel et historique.
     Route::get('/sales', [SaleController::class, 'index']);

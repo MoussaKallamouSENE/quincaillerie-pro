@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import {
   Component,
@@ -19,6 +19,8 @@ import { CashService } from '../../services/cash-service';
 import { CashSession } from '../../services/cash.model';
 import { CustomerService } from '../../services/customer-service';
 import { Customer, CustomersPage } from '../../services/customer.model';
+import { ExpenseService } from '../../services/expense-service';
+import { Expense, ExpensesPage } from '../../services/expense.model';
 import { ProductService } from '../../services/product-service';
 import { Product, ProductsPage } from '../../services/product.model';
 import { SaleService } from '../../services/sale-service';
@@ -84,7 +86,7 @@ function formatMoney(amount: number): string {
  */
 @Component({
   selector: 'app-pos',
-  imports: [DecimalPipe, ReactiveFormsModule],
+  imports: [DatePipe, DecimalPipe, ReactiveFormsModule],
   templateUrl: './pos.html',
   styleUrl: './pos.css',
 })
@@ -93,6 +95,7 @@ export class Pos {
   private readonly saleService = inject(SaleService);
   private readonly productService = inject(ProductService);
   private readonly customerService = inject(CustomerService);
+  private readonly expenseService = inject(ExpenseService);
   private readonly toastService = inject(ToastService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
@@ -126,6 +129,36 @@ export class Pos {
   protected readonly customers = httpResource<CustomersPage>(() =>
     this.cashSession() ? this.customerService.listRequest({ per_page: MAX_PER_PAGE }) : undefined,
   );
+
+  /**
+   * Depenses de la session de caisse ouverte.
+   *
+   * L'encart n'a de sens qu'une fois la caisse ouverte : la requete suit donc
+   * la session, comme le catalogue et les clients.
+   */
+  protected readonly expenses = httpResource<ExpensesPage>(() =>
+    this.cashSession() ? this.expenseService.listRequest() : undefined,
+  );
+
+  /** Depenses affichees dans l'encart, de la plus recente a la plus ancienne. */
+  protected readonly expenseRows = computed<Expense[]>(() => this.expenses.value()?.data ?? []);
+
+  /** Total des depenses de la session, en FCFA. */
+  protected readonly expensesTotal = computed(() => {
+    const meta = this.expenses.value()?.meta;
+
+    return meta ? Number(meta.total) : Number(this.cashSession()?.expenses_total ?? 0);
+  });
+
+  /** Vrai pendant le chargement des depenses. */
+  protected readonly expensesLoading = computed(() => this.expenses.isLoading());
+
+  /** Message d'erreur lisible quand les depenses ne peuvent pas etre chargees. */
+  protected readonly expensesError = computed<string | null>(() => {
+    const error = this.expenses.error();
+
+    return error ? extractErrorMessage(error, 'Impossible de charger les dépenses.') : null;
+  });
 
   /** Terme de recherche saisi dans la barre de recherche. */
   protected readonly searchTerm = signal('');
@@ -254,14 +287,39 @@ export class Pos {
     closing_balance: [0, [Validators.required, Validators.min(0)]],
   });
 
+  /** Vrai quand la modale d'enregistrement d'une depense est ouverte. */
+  protected readonly expenseModalOpen = signal(false);
+
+  /** Vrai pendant l'enregistrement de la depense. */
+  protected readonly expenseSubmitting = signal(false);
+
+  /** Message d'erreur de la modale de depense. */
+  protected readonly expenseError = signal<string | null>(null);
+
+  /** Formulaire de depense (motif et montant paye depuis le tiroir). */
+  protected readonly expenseForm = this.formBuilder.group({
+    name: ['', [Validators.required, Validators.maxLength(255)]],
+    amount: [0, [Validators.required, Validators.min(0.01)]],
+  });
+
   /** Champ du fond de caisse, cible du focus a l'ouverture de la modale. */
   private readonly openingInput = viewChild<ElementRef<HTMLInputElement>>('openingInput');
+
+  /** Champ du motif, cible du focus a l'ouverture de la modale de depense. */
+  private readonly expenseInput = viewChild<ElementRef<HTMLInputElement>>('expenseInput');
 
   constructor() {
     // Le focus revient sur le fond de caisse a chaque ouverture de la modale.
     effect(() => {
       if (this.needsOpening()) {
         this.openingInput()?.nativeElement.focus();
+      }
+    });
+
+    // Le focus revient sur le motif a chaque ouverture de la modale de depense.
+    effect(() => {
+      if (this.expenseModalOpen()) {
+        this.expenseInput()?.nativeElement.focus();
       }
     });
 
@@ -548,6 +606,62 @@ export class Pos {
   /** Ferme le resume de cloture : l'ecran redemande l'ouverture de la caisse. */
   protected onDismissClosingSummary(): void {
     this.closingSummary.set(null);
+  }
+
+  /** Ouvre la modale d'enregistrement d'une depense. */
+  protected onOpenExpense(): void {
+    this.expenseForm.reset({ name: '', amount: 0 });
+    this.expenseError.set(null);
+    this.expenseModalOpen.set(true);
+  }
+
+  /** Ferme la modale de depense sans enregistrer. */
+  protected onCancelExpense(): void {
+    if (!this.expenseSubmitting()) {
+      this.expenseModalOpen.set(false);
+    }
+  }
+
+  /**
+   * Enregistre la depense sur la session de caisse ouverte.
+   *
+   * Le backend rattache la depense a la session courante : son montant est
+   * retire du tiroir, donc le solde theorique de la session est recharge.
+   */
+  protected onSaveExpense(): void {
+    if (this.expenseForm.invalid) {
+      this.expenseForm.markAllAsTouched();
+
+      return;
+    }
+
+    const { name, amount } = this.expenseForm.getRawValue();
+
+    this.expenseSubmitting.set(true);
+    this.expenseError.set(null);
+
+    this.expenseService
+      .createExpense({ name: (name ?? '').trim(), amount: Number(amount ?? 0) })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (expense) => {
+          this.expenseSubmitting.set(false);
+          this.expenseModalOpen.set(false);
+
+          this.toastService.success(
+            `Dépense « ${expense.name} » enregistrée : ${formatMoney(Number(expense.amount))} FCFA.`,
+          );
+
+          // Le tiroir a change : l'encart et le theorique de caisse sont
+          // rafraichis. `reload()` est necessaire car l'URL ne change pas.
+          this.expenses.reload();
+          this.loadSession();
+        },
+        error: (error: unknown) => {
+          this.expenseSubmitting.set(false);
+          this.expenseError.set(extractErrorMessage(error, 'Impossible d’enregistrer la dépense.'));
+        },
+      });
   }
 
   /**

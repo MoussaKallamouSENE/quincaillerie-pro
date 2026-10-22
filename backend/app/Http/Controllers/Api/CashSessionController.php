@@ -83,7 +83,10 @@ class CashSessionController extends Controller
                 throw new NoOpenCashSessionException;
             }
 
-            // Theoretical balance of the drawer, frozen at closing time.
+            // Theoretical balance of the drawer, frozen at closing time:
+            // opening balance + cash sales - expenses.
+            // The balance is written on the session, so an expense recorded
+            // later cannot rewrite the history of the closed session.
             $cashSession->expected_cash = $cashSession->computeExpectedCash();
 
             $cashSession->closing_balance = $request->validated('closing_balance');

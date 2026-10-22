@@ -8,6 +8,7 @@ import { provideRouter } from '@angular/router';
 import { ToastService } from '../../core/toast/toast-service';
 import { CashSession } from '../../services/cash.model';
 import { Customer, CustomersPage } from '../../services/customer.model';
+import { Expense, ExpensesPage } from '../../services/expense.model';
 import { Product, ProductsPage } from '../../services/product.model';
 import { Sale } from '../../services/sale.model';
 import { Pos } from './pos';
@@ -86,6 +87,31 @@ function buildCustomersPage(data: Customer[]): CustomersPage {
   };
 }
 
+function buildExpense(overrides: Partial<Expense> = {}): Expense {
+  return {
+    id: 4,
+    cash_session_id: 7,
+    user_id: 1,
+    name: 'Transport livraison',
+    amount: '1000.00',
+    date: '2026-10-22',
+    created_at: '2026-10-22T09:00:00+00:00',
+    updated_at: '2026-10-22T09:00:00+00:00',
+    ...overrides,
+  };
+}
+
+function buildExpensesPage(data: Expense[], total = '0.00'): ExpensesPage {
+  return {
+    data,
+    meta: {
+      cash_session_id: 7,
+      count: data.length,
+      total,
+    },
+  };
+}
+
 function buildCashSession(overrides: Partial<CashSession> = {}): CashSession {
   return {
     id: 7,
@@ -153,6 +179,14 @@ describe('Pos', () => {
   /** Requete d'enregistrement d'une vente. */
   const isSalesRequest = (request: HttpRequest<unknown>) => request.url.endsWith('/api/sales');
 
+  /** Requete de la liste des depenses de la session (GET). */
+  const isExpensesRequest = (request: HttpRequest<unknown>) =>
+    request.url.endsWith('/api/expenses') && request.method === 'GET';
+
+  /** Requete d'enregistrement d'une depense (POST). */
+  const isCreateExpenseRequest = (request: HttpRequest<unknown>) =>
+    request.url.endsWith('/api/expenses') && request.method === 'POST';
+
   /**
    * Laisse les reponses HTTP et les signaux se propager.
    *
@@ -176,6 +210,13 @@ describe('Pos', () => {
     await settle();
     httpMock.expectOne(isProductsRequest).flush(buildProductsPage(products));
     httpMock.expectOne(isCustomersRequest).flush(buildCustomersPage([buildCustomer()]));
+    await settle();
+  }
+
+  /** Repond a l'encart des depenses de la session. */
+  async function flushExpenses(data: Expense[] = [], total = '0.00'): Promise<void> {
+    await settle();
+    httpMock.expectOne(isExpensesRequest).flush(buildExpensesPage(data, total));
     await settle();
   }
 
@@ -257,6 +298,10 @@ describe('Pos', () => {
       .match(isCloseSessionRequest)
       .forEach((request) => request.flush({ data: buildCashSession({ status: 'closed' }) }));
     httpMock.match(isSalesRequest).forEach((request) => request.flush({ data: buildSale() }));
+    httpMock.match(isExpensesRequest).forEach((request) => request.flush(buildExpensesPage([])));
+    httpMock
+      .match(isCreateExpenseRequest)
+      .forEach((request) => request.flush({ data: buildExpense() }));
   });
 
   it('should create', () => {
@@ -501,5 +546,136 @@ describe('Pos', () => {
       'Caisse clôturée avec succès. Écart : 1 000,00 FCFA',
     );
     expect(toast?.type).toBe('success');
+  });
+
+  it('should open the expense modal from the header', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses([]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Enregistrer une dépense')?.click();
+    fixture.detectChanges();
+
+    expect(dialog()).toBeTruthy();
+    expect(element.textContent).toContain('Motif de la dépense');
+    expect(element.textContent).toContain('Montant');
+    expect(element.textContent).toContain('La dépense sera retirée du tiroir');
+  });
+
+  it('should refuse an expense without a reason', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses([]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Enregistrer une dépense')?.click();
+    fixture.detectChanges();
+
+    const form = dialog()?.querySelector('form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Ce champ est obligatoire.');
+    expect(element.textContent).toContain('La valeur doit être positive.');
+    httpMock.expectNone(isCreateExpenseRequest);
+  });
+
+  it('should record an expense on the open cash session', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses([]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Enregistrer une dépense')?.click();
+    fixture.detectChanges();
+
+    setField('#pos-expense-name', 'Transport');
+    setField('#pos-expense-amount', '1500');
+
+    const form = dialog()?.querySelector('form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne(isCreateExpenseRequest);
+    expect(request.request.body).toEqual({ name: 'Transport', amount: 1500 });
+
+    request.flush({ data: buildExpense({ name: 'Transport', amount: '1500.00' }) });
+    await settle();
+
+    // La modale se referme et la depense est annoncee au vendeur.
+    expect(dialog()).toBeNull();
+
+    const toast = toastService.toasts()[0];
+    expect(toast?.type).toBe('success');
+    expect(normalizeSpaces(toast?.message ?? '')).toContain('Transport');
+    expect(normalizeSpaces(toast?.message ?? '')).toContain('1 500,00');
+
+    // Le tiroir a change : la liste et le theorique sont recharges.
+    expect(element.textContent).not.toContain('La dépense sera retirée du tiroir');
+  });
+
+  it('should keep the expense modal open when the expense is refused', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses([]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Enregistrer une dépense')?.click();
+    fixture.detectChanges();
+
+    setField('#pos-expense-name', 'Transport');
+    setField('#pos-expense-amount', '1500');
+
+    const form = dialog()?.querySelector('form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne(isCreateExpenseRequest)
+      .flush(
+        { message: 'Aucune session de caisse n’est ouverte.' },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await settle();
+
+    expect(dialog()).toBeTruthy();
+    expect(element.textContent).toContain('Aucune session de caisse n’est ouverte.');
+    expect(toastService.toasts()).toHaveLength(0);
+  });
+
+  it('should list the expenses of the cash session', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses(
+      [
+        buildExpense({ id: 2, name: 'Fournitures', amount: '2500.00' }),
+        buildExpense({ id: 1, name: 'Transport', amount: '1000.00' }),
+      ],
+      '3500.00',
+    );
+
+    const text = normalizeSpaces((fixture.nativeElement as HTMLElement).textContent ?? '');
+
+    expect(text).toContain('Dépenses de la journée');
+    expect(text).toContain('Fournitures');
+    expect(text).toContain('Transport');
+    expect(text).toContain('2 500,00');
+    expect(text).toContain('1 000,00');
+    expect(text).toContain('3 500,00 FCFA');
+  });
+
+  it('should show an empty state when the session has no expense', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([]);
+    await flushExpenses([]);
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Aucune dépense enregistrée pour cette session.',
+    );
   });
 });

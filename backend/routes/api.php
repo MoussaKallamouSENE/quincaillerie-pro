@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UnitController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -20,6 +21,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('suppliers', SupplierController::class);
+
+    // Utilisateurs : accessible aux comptes autorises a gérer les comptes.
+    Route::apiResource('users', UserController::class);
 
     // Caisse : une seule session ouverte par utilisateur.
     Route::post('/cash-sessions/open', [CashSessionController::class, 'open']);

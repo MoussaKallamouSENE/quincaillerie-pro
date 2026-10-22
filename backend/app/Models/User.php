@@ -12,12 +12,12 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'is_active'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasRoles, HasApiTokens;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
      * Get the attributes that should be cast.
@@ -48,9 +48,28 @@ class User extends Authenticatable
         return $this->hasMany(Reception::class);
     }
 
-    public function sales() { return $this->hasMany(Sale::class); }
-    public function cashSessions() { return $this->hasMany(CashSession::class); }
-    public function payments() { return $this->hasMany(Payment::class); }
-    public function cashMovements() { return $this->hasMany(CashMovement::class); }
-    public function expenses() { return $this->hasMany(Expense::class); }
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
+
+    public function cashSessions()
+    {
+        return $this->hasMany(CashSession::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function cashMovements()
+    {
+        return $this->hasMany(CashMovement::class);
+    }
+
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class);
+    }
 }

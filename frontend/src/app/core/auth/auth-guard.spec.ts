@@ -8,7 +8,7 @@ import {
 } from '@angular/router';
 import { AuthApi } from './auth-api';
 import { AuthService } from './auth-service';
-import { authGuard, guestGuard, roleGuard } from './auth-guard';
+import { authGuard, guestGuard, permissionOrRoleGuard, roleGuard } from './auth-guard';
 import { of } from 'rxjs';
 import type { LoginResponse, MeResponse } from './auth.model';
 
@@ -97,5 +97,38 @@ describe('authGuard', () => {
 
     expect(allowed).toBe(true);
     expect(denied).toBeInstanceOf(UrlTree);
+  });
+
+  it('should allow a user holding one of the required roles', async () => {
+    await store.signIn({ email: 'a@b.c', password: 'x' });
+
+    const result = await TestBed.runInInjectionContext(() =>
+      permissionOrRoleGuard('gerer_utilisateurs', ['Admin', 'Gérant'])(route, state),
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('should redirect a user without the permission nor the role', async () => {
+    await store.signIn({ email: 'a@b.c', password: 'x' });
+
+    const result = await TestBed.runInInjectionContext(() =>
+      permissionOrRoleGuard('gerer_utilisateurs', ['Employé'])(route, state),
+    );
+
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(router.serializeUrl(result as UrlTree)).toContain('/dashboard');
+  });
+
+  it('should load the profile before checking a restricted route', async () => {
+    // Jeton restaure mais profil pas encore charge (rechargement direct).
+    store.saveToken('token-abc');
+
+    const result = await TestBed.runInInjectionContext(() =>
+      permissionOrRoleGuard('gerer_utilisateurs', ['Admin'])(route, state),
+    );
+
+    expect(store.user()?.roles).toContain('Admin');
+    expect(result).toBe(true);
   });
 });

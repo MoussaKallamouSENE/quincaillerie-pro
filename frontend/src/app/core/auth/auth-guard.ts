@@ -55,3 +55,35 @@ export function roleGuard(allowedRoles: string[]): CanActivateFn {
     return router.createUrlTree(['/dashboard'], { queryParams: { denied: state.url } });
   };
 }
+
+/**
+ * Restreint une route a une permission Spatie ou a certains roles.
+ *
+ * Usage : `permissionOrRoleGuard('gerer_utilisateurs', ['Admin', 'Gérant'])`
+ *
+ * Contrairement a `roleGuard`, le guard attend le chargement du profil quand
+ * l'utilisateur est authentifie mais que `GET /api/me` n'a pas encore repondu
+ * (rechargement direct de la page) : sans cela, un administrateur serait
+ * redirige a tort avant meme que ses roles soient connus.
+ *
+ * Le controle reel reste assure par le serveur.
+ */
+export function permissionOrRoleGuard(
+  permission: string,
+  allowedRoles: readonly string[],
+): CanActivateFn {
+  return async (_route, state) => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+
+    if (auth.isAuthenticated() && !auth.user()) {
+      await auth.refreshProfile().catch(() => undefined);
+    }
+
+    if (auth.hasPermission(permission) || auth.hasRole(...allowedRoles)) {
+      return true;
+    }
+
+    return router.createUrlTree(['/dashboard'], { queryParams: { denied: state.url } });
+  };
+}

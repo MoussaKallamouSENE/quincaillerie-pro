@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth-guard';
+import { authGuard, guestGuard, permissionOrRoleGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
   {
@@ -50,6 +50,13 @@ export const routes: Routes = [
         path: 'suppliers',
         loadComponent: () => import('./pages/suppliers/supplier-list').then((m) => m.SupplierList),
         title: 'Fournisseurs - Quincaillerie Pro',
+      },
+      {
+        // Reserve aux comptes autorises a gerer les utilisateurs.
+        path: 'users',
+        canActivate: [permissionOrRoleGuard('gerer_utilisateurs', ['Admin', 'Gérant'])],
+        loadComponent: () => import('./pages/users/user-list').then((m) => m.UserList),
+        title: 'Utilisateurs - Quincaillerie Pro',
       },
     ],
   },

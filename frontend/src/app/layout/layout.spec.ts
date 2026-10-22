@@ -1,14 +1,46 @@
+import { computed, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { AuthService } from '../core/auth/auth-service';
 import { Layout } from './layout';
 
 describe('Layout', () => {
   let fixture: ComponentFixture<Layout>;
 
+  /** Roles et permissions du faux utilisateur connecte. */
+  const roles = signal<string[]>([]);
+  const permissions = signal<string[]>([]);
+
+  const authMock = {
+    user: signal(null).asReadonly(),
+    roles: roles.asReadonly(),
+    permissions: permissions.asReadonly(),
+    displayName: computed(() => ''),
+    initials: computed(() => ''),
+    isAuthenticated: computed(() => true),
+    hasRole: (...allowed: string[]) => allowed.some((role) => roles().includes(role)),
+    hasPermission: (...allowed: string[]) =>
+      allowed.some((permission) => permissions().includes(permission)),
+    refreshProfile: vi.fn().mockResolvedValue(undefined),
+    signOut: vi.fn().mockResolvedValue(undefined),
+  };
+
+  /** Lien du menu vers la gestion des utilisateurs, s'il est affiche. */
+  function usersLink(): HTMLAnchorElement | undefined {
+    const element = fixture.nativeElement as HTMLElement;
+
+    return Array.from(element.querySelectorAll('a[href]')).find(
+      (link) => link.getAttribute('href') === '/users',
+    ) as HTMLAnchorElement | undefined;
+  }
+
   beforeEach(async () => {
+    roles.set([]);
+    permissions.set([]);
+
     await TestBed.configureTestingModule({
       imports: [Layout],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), { provide: AuthService, useValue: authMock }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Layout);
@@ -42,5 +74,34 @@ describe('Layout', () => {
 
     expect(disabled.length).toBeGreaterThan(0);
     expect(element.textContent).toContain('Rapports');
+  });
+
+  it('should hide the users entry from an employee', () => {
+    roles.set(['Employé']);
+    fixture.detectChanges();
+
+    expect(usersLink()).toBeUndefined();
+  });
+
+  it('should show the users entry to an admin', () => {
+    roles.set(['Admin']);
+    fixture.detectChanges();
+
+    expect(usersLink()?.textContent).toContain('Utilisateurs');
+  });
+
+  it('should show the users entry to a manager', () => {
+    roles.set(['Gérant']);
+    fixture.detectChanges();
+
+    expect(usersLink()).toBeDefined();
+  });
+
+  it('should show the users entry when the permission is granted', () => {
+    roles.set(['Employé']);
+    permissions.set(['gerer_utilisateurs']);
+    fixture.detectChanges();
+
+    expect(usersLink()).toBeDefined();
   });
 });

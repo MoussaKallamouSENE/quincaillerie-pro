@@ -1,0 +1,627 @@
+<div>
+  <!-- Titre + actions -->
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Utilisateurs</h1>
+      <p class="mt-1 text-sm text-slate-400">Gérez l’équipe et les accès à l’application</p>
+    </div>
+
+    <button
+      type="button"
+      (click)="onCreateUser()"
+      class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+    >
+      <svg
+        class="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-hidden="true"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Nouvel Utilisateur
+    </button>
+  </div>
+
+  <!-- Équipe -->
+  <section
+    class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+    >
+      <!-- Recherche -->
+      <div class="relative w-full max-w-sm">
+        <svg
+          class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+          />
+        </svg>
+        <input
+          type="search"
+          placeholder="Rechercher par nom, email, téléphone…"
+          aria-label="Rechercher un utilisateur"
+          [value]="searchTerm()"
+          (input)="onSearch($event)"
+          class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-3 pl-10 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <p class="text-sm text-slate-400">
+        <span class="font-semibold text-slate-200">{{ resultCount() }}</span>
+        @if (resultCount() > 1) {
+          utilisateurs
+        } @else {
+          utilisateur
+        }
+        @if (searchTerm().trim()) {
+          sur {{ totalCount() }}
+        }
+      </p>
+    </header>
+
+    @if (users.isLoading()) {
+      <!-- Chargement -->
+      <p class="sr-only" role="status">Chargement des utilisateurs…</p>
+      <div class="overflow-x-auto" aria-hidden="true">
+        <table class="w-full min-w-[880px] text-left text-sm">
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+              <tr>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-40 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-48 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-32 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-16 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-3.5 w-16 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (users.error()) {
+      <!-- Erreur -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-red-400 ring-1 ring-red-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </span>
+        <p class="mt-4 text-sm font-medium text-red-300">Liste des utilisateurs indisponible</p>
+        <p class="mt-1 text-xs text-slate-400">{{ errorMessage() }}</p>
+        <button
+          type="button"
+          (click)="reload()"
+          class="mt-4 rounded-lg border border-red-500/40 px-3.5 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+        >
+          Réessayer
+        </button>
+      </div>
+    } @else if (filteredUsers().length === 0) {
+      <!-- Aucun résultat -->
+      <div class="px-6 py-16 text-center">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+            />
+          </svg>
+        </span>
+        @if (isEmptySearch()) {
+          <p class="mt-4 text-sm font-medium text-slate-200">
+            Aucun utilisateur ne correspond à « {{ searchTerm().trim() }} »
+          </p>
+          <p class="mt-1 text-xs text-slate-400">Essayez un autre terme de recherche.</p>
+          <button
+            type="button"
+            (click)="clearSearch()"
+            class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40"
+          >
+            Réinitialiser la recherche
+          </button>
+        } @else {
+          <p class="mt-4 text-sm font-medium text-slate-200">Aucun utilisateur enregistré</p>
+          <p class="mt-1 text-xs text-slate-400">
+            Créez un compte pour donner accès à la caisse à un collaborateur.
+          </p>
+        }
+      </div>
+    } @else {
+      <!-- Tableau -->
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[880px] text-left text-sm">
+          <caption class="sr-only">
+            Liste des utilisateurs
+          </caption>
+
+          <thead>
+            <tr
+              class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
+            >
+              <th scope="col" class="px-6 py-3 font-medium">Nom</th>
+              <th scope="col" class="px-6 py-3 font-medium">Email</th>
+              <th scope="col" class="px-6 py-3 font-medium">Téléphone</th>
+              <th scope="col" class="px-6 py-3 font-medium">Rôle</th>
+              <th scope="col" class="px-6 py-3 font-medium">Statut</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (user of filteredUsers(); track user.id) {
+              <tr class="transition hover:bg-emerald-900/30">
+                <!-- Nom -->
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <span
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/25"
+                      aria-hidden="true"
+                    >
+                      {{ initials(user.name) }}
+                    </span>
+                    <div class="min-w-0">
+                      <p class="truncate font-medium text-slate-100">{{ user.name }}</p>
+                      @if (isCurrentUser(user)) {
+                        <p class="text-[11px] font-medium text-emerald-400">Vous</p>
+                      }
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Email -->
+                <td class="px-6 py-4 text-slate-400">{{ user.email }}</td>
+
+                <!-- Téléphone -->
+                <td class="px-6 py-4 text-slate-400">{{ user.phone ?? '—' }}</td>
+
+                <!-- Rôle -->
+                <td class="px-6 py-4">
+                  @if (user.role) {
+                    <span [class]="roleBadgeClasses(user.role)">{{ user.role.toUpperCase() }}</span>
+                  } @else {
+                    <span class="text-slate-500">—</span>
+                  }
+                </td>
+
+                <!-- Statut -->
+                <td class="px-6 py-4">
+                  @if (user.is_active) {
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-500/25 ring-inset"
+                    >
+                      <span
+                        class="h-1.5 w-1.5 rounded-full bg-emerald-400"
+                        aria-hidden="true"
+                      ></span>
+                      Actif
+                    </span>
+                  } @else {
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-semibold text-slate-300 ring-1 ring-slate-500/25 ring-inset"
+                    >
+                      <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
+                      Inactif
+                    </span>
+                  }
+                </td>
+
+                <!-- Actions -->
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      (click)="onEditUser(user)"
+                      [attr.aria-label]="'Modifier ' + user.name"
+                      title="Modifier"
+                      class="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-900/50 hover:text-emerald-300"
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                        />
+                      </svg>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="onDeleteUser(user)"
+                      [disabled]="isCurrentUser(user)"
+                      [attr.aria-label]="'Supprimer ' + user.name"
+                      [attr.title]="
+                        isCurrentUser(user)
+                          ? 'Vous ne pouvez pas supprimer votre propre compte'
+                          : 'Supprimer'
+                      "
+                      class="rounded-lg p-2 text-slate-400 transition hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- Modale de création / modification -->
+  @if (isModalOpen()) {
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      (click)="closeModal()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-modal-title"
+        class="my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-800/60 bg-[#153322] shadow-2xl shadow-emerald-950/60"
+        (click)="$event.stopPropagation()"
+      >
+        <!-- En-tête -->
+        <header
+          class="flex items-start justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+        >
+          <div>
+            <h2 id="user-modal-title" class="text-lg font-semibold text-slate-100">
+              {{ isEditing() ? 'Modifier l’utilisateur' : 'Nouvel Utilisateur' }}
+            </h2>
+            <p class="mt-1 text-xs text-slate-400">
+              @if (isEditing()) {
+                Mettez à jour les informations et le rôle de ce collaborateur.
+              } @else {
+                Créez un compte pour un collaborateur de la quincaillerie.
+              }
+            </p>
+          </div>
+
+          <button
+            type="button"
+            (click)="closeModal()"
+            aria-label="Fermer la modale"
+            class="rounded-lg p-1.5 text-slate-400 transition hover:bg-emerald-900/50 hover:text-slate-100"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+
+        <!-- Formulaire -->
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <div class="max-h-[60vh] overflow-y-auto px-6 py-5">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <!-- Nom -->
+              <div>
+                <label
+                  for="user-name"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Nom
+                </label>
+                <input
+                  id="user-name"
+                  #nameInput
+                  type="text"
+                  formControlName="name"
+                  placeholder="Awa Diop"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.name); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label
+                  for="user-email"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Email
+                </label>
+                <input
+                  id="user-email"
+                  type="email"
+                  formControlName="email"
+                  placeholder="awa.diop@quincaillerie.com"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.email); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Téléphone -->
+              <div>
+                <label
+                  for="user-phone"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Téléphone
+                </label>
+                <input
+                  id="user-phone"
+                  type="tel"
+                  formControlName="phone"
+                  placeholder="+221 77 000 00 00"
+                  autocomplete="off"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (errorFor(form.controls.phone); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Rôle -->
+              <div>
+                <label
+                  for="user-role"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Rôle
+                </label>
+                <select
+                  id="user-role"
+                  formControlName="role"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                >
+                  @for (role of roles; track role) {
+                    <option [value]="role" class="bg-[#153322]">{{ role }}</option>
+                  }
+                </select>
+                @if (errorFor(form.controls.role); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Mot de passe -->
+              <div class="sm:col-span-2">
+                <label
+                  for="user-password"
+                  class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase"
+                >
+                  Mot de passe
+                </label>
+                <input
+                  id="user-password"
+                  type="password"
+                  formControlName="password"
+                  [placeholder]="
+                    isEditing() ? 'Laisser vide pour conserver' : '8 caractères minimum'
+                  "
+                  autocomplete="new-password"
+                  class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                @if (isEditing()) {
+                  <p class="mt-1 text-xs text-slate-500">
+                    Laissez vide pour conserver le mot de passe actuel.
+                  </p>
+                }
+                @if (errorFor(form.controls.password); as error) {
+                  <p class="mt-1 text-xs text-red-400">{{ error }}</p>
+                }
+              </div>
+
+              <!-- Statut -->
+              <div class="sm:col-span-2">
+                <label
+                  for="user-active"
+                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-3 py-2.5"
+                >
+                  <input
+                    id="user-active"
+                    type="checkbox"
+                    formControlName="is_active"
+                    class="h-4 w-4 rounded border-emerald-700 bg-emerald-950 accent-emerald-500"
+                  />
+                  <span class="text-sm text-slate-300">
+                    Compte actif
+                    <span class="block text-xs text-slate-500">
+                      Un compte inactif ne peut pas se connecter à l’application.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Erreur globale du formulaire -->
+            @if (formError(); as error) {
+              <p
+                role="alert"
+                class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              >
+                {{ error }}
+              </p>
+            }
+          </div>
+
+          <!-- Actions -->
+          <footer
+            class="flex flex-wrap items-center justify-end gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+          >
+            <button
+              type="button"
+              (click)="closeModal()"
+              class="rounded-lg border border-emerald-800/60 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/40"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              @if (submitting()) {
+                Enregistrement…
+              } @else if (isEditing()) {
+                Enregistrer les modifications
+              } @else {
+                Créer l’utilisateur
+              }
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- Confirmation de suppression -->
+  @if (userToDelete(); as user) {
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      (click)="cancelDelete()"
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-user-title"
+        class="my-auto w-full max-w-md overflow-hidden rounded-2xl border border-red-900/50 bg-[#153322] shadow-2xl shadow-emerald-950/60"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="px-6 py-5">
+          <span
+            class="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-400 ring-1 ring-red-500/25"
+            aria-hidden="true"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+              />
+            </svg>
+          </span>
+
+          <h2 id="delete-user-title" class="mt-4 text-lg font-semibold text-slate-100">
+            Supprimer cet utilisateur ?
+          </h2>
+          <p class="mt-2 text-sm text-slate-400">
+            Le compte de
+            <span class="font-medium text-slate-200">{{ user.name }}</span>
+            sera définitivement supprimé. Un compte ayant enregistré de l’activité (ventes, caisse,
+            stock…) ne peut pas être supprimé : désactivez-le plutôt.
+          </p>
+
+          @if (deleteError(); as error) {
+            <p
+              role="alert"
+              class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+            >
+              {{ error }}
+            </p>
+          }
+        </div>
+
+        <footer
+          class="flex flex-wrap items-center justify-end gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+        >
+          <button
+            type="button"
+            (click)="cancelDelete()"
+            class="rounded-lg border border-emerald-800/60 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/40"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            (click)="onConfirmDelete()"
+            [disabled]="deleting()"
+            class="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            @if (deleting()) {
+              Suppression…
+            } @else {
+              Supprimer
+            }
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+</div>

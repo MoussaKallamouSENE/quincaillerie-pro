@@ -34,7 +34,7 @@
     <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-5" aria-label="Navigation principale">
       <p class="px-3 pb-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">Menu</p>
 
-      @for (item of navItems; track item.label) {
+      @for (item of visibleNavItems(); track item.label) {
         @if (item.path) {
           <a
             [routerLink]="item.path"

@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth-service';
 import { ToastContainer } from '../core/toast/toast-container';
@@ -17,6 +17,10 @@ interface NavItem {
    * alors rendue comme un bouton inactif.
    */
   readonly path: string | null;
+  /** Permission Spatie exigee pour voir l'entree (alternative aux roles). */
+  readonly permission?: string;
+  /** Roles autorises a voir l'entree. */
+  readonly roles?: readonly string[];
 }
 
 /** Menu lateral de l'application. */
@@ -57,6 +61,15 @@ const NAV_ITEMS: readonly NavItem[] = [
     icon: 'M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129.504 1.09 1.124a17.902 17.902 0 01-3.213 9.193 2.25 2.25 0 01-2.37 1.517H12.75c-1.217 0-2.355-.668-3.06-1.752a15.05 15.05 0 01-2.06-3.531M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12',
   },
   {
+    label: 'Utilisateurs',
+    path: '/users',
+    icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z',
+    // Entree reservee aux admins/gerants ou aux comptes disposant de la
+    // permission : un employe ne doit pas la voir.
+    permission: 'gerer_utilisateurs',
+    roles: ['Admin', 'Gérant'],
+  },
+  {
     label: 'Rapports',
     path: null,
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
@@ -86,8 +99,16 @@ export class Layout implements OnInit {
   /** Date du jour, affichee dans la barre superieure. */
   protected readonly today = new Date();
 
-  /** Menu lateral. */
-  protected readonly navItems = NAV_ITEMS;
+  /**
+   * Menu lateral filtre selon les droits de l'utilisateur connecte.
+   *
+   * Une entree sans restriction est toujours visible ; une entree restreinte
+   * l'est si l'utilisateur possede la permission ou l'un des roles demandes.
+   * Tant que le profil n'est pas charge, les entrees restreintes sont masquees.
+   */
+  protected readonly visibleNavItems = computed(() =>
+    NAV_ITEMS.filter((item) => this.canSeeNavItem(item)),
+  );
 
   /** Vrai quand la barre laterale est ouverte sur mobile. */
   protected readonly sidebarOpen = signal(false);
@@ -108,6 +129,18 @@ export class Layout implements OnInit {
   /** Ferme la barre laterale (mobile). */
   protected closeSidebar(): void {
     this.sidebarOpen.set(false);
+  }
+
+  /** Vrai si l'entree du menu est visible pour l'utilisateur connecte. */
+  private canSeeNavItem(item: NavItem): boolean {
+    if (!item.permission && !item.roles?.length) {
+      return true;
+    }
+
+    const hasPermission = item.permission ? this.auth.hasPermission(item.permission) : false;
+    const hasRole = item.roles ? this.auth.hasRole(...item.roles) : false;
+
+    return hasPermission || hasRole;
   }
 
   /** Deconnecte l'utilisateur et revient a la page de connexion. */

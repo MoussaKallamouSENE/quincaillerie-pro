@@ -14,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { extractErrorMessage } from '../../core/http/api-error';
+import { downloadBlob } from '../../core/http/download-file';
 import { ToastService } from '../../core/toast/toast-service';
 import { CashService } from '../../services/cash-service';
 import { CashSession } from '../../services/cash.model';
@@ -24,7 +25,7 @@ import { Expense, ExpensesPage } from '../../services/expense.model';
 import { ProductService } from '../../services/product-service';
 import { Product, ProductsPage } from '../../services/product.model';
 import { SaleService } from '../../services/sale-service';
-import { PaymentMethod, SalePayload } from '../../services/sale.model';
+import { PaymentMethod, Sale, SalePayload } from '../../services/sale.model';
 
 /**
  * Nombre maximum de produits demandes a l'API.
@@ -42,6 +43,14 @@ interface CartLine {
   readonly quantity: number;
   /** Prix unitaire applique a la caisse, en FCFA. */
   readonly unitPrice: number;
+}
+
+/** Vente qui vient d'etre enregistree, avec la monnaie rendue. */
+interface CompletedSale {
+  /** Vente renvoyee par l'API. */
+  readonly sale: Sale;
+  /** Monnaie a rendre au client, en FCFA. */
+  readonly change: number;
 }
 
 /** Mode de paiement propose a la caisse. */
@@ -258,6 +267,12 @@ export class Pos {
 
   /** Vrai pendant l'enregistrement de la vente. */
   protected readonly submitting = signal(false);
+
+  /** Vente qui vient d'etre enregistree, affichee dans la modale de succes. */
+  protected readonly completedSale = signal<CompletedSale | null>(null);
+
+  /** Vrai pendant la generation de la facture de la vente terminee. */
+  protected readonly invoiceSubmitting = signal(false);
 
   /** Message d'erreur global de la vente (reponse du serveur). */
   protected readonly saleError = signal<string | null>(null);
@@ -506,6 +521,9 @@ export class Pos {
               : `Vente ${sale.reference} enregistrée avec succès.`,
           );
 
+          // La modale de succes propose d'imprimer la facture tout de suite.
+          this.completedSale.set({ sale, change });
+
           // Le stock a change et le theorique de caisse aussi.
           this.products.reload();
           this.loadSession();
@@ -515,6 +533,43 @@ export class Pos {
           this.saleError.set(extractErrorMessage(error, 'Impossible d’enregistrer la vente.'));
         },
       });
+  }
+
+  /**
+   * Telecharge la facture de la vente qui vient d'etre enregistree.
+   *
+   * Le PDF arrive sous forme de blob : un lien temporaire declenche le
+   * telechargement, sans quitter l'ecran de caisse.
+   */
+  protected onDownloadInvoice(): void {
+    const completed = this.completedSale();
+
+    if (!completed || this.invoiceSubmitting()) {
+      return;
+    }
+
+    this.invoiceSubmitting.set(true);
+
+    this.saleService
+      .downloadInvoice(completed.sale.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.invoiceSubmitting.set(false);
+          downloadBlob(blob, `facture-${completed.sale.reference}.pdf`);
+        },
+        error: (error: unknown) => {
+          this.invoiceSubmitting.set(false);
+          this.toastService.error(
+            extractErrorMessage(error, 'Impossible de telecharger la facture.'),
+          );
+        },
+      });
+  }
+
+  /** Ferme la confirmation et prepare la vente suivante. */
+  protected onCloseCompletedSale(): void {
+    this.completedSale.set(null);
   }
 
   /** Ouvre la caisse avec le fond de caisse saisi. */

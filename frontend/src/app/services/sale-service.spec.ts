@@ -95,6 +95,24 @@ describe('SaleService', () => {
     expect(received).toEqual(SALE);
   });
 
+  it('should GET the invoice as a blob', () => {
+    let received: Blob | undefined;
+
+    service.downloadInvoice(12).subscribe((blob) => {
+      received = blob;
+    });
+
+    const request = httpMock.expectOne(`${environment.apiUrl}/sales/12/invoice`);
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.responseType).toBe('blob');
+
+    const pdf = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    request.flush(pdf);
+
+    expect(received).toBe(pdf);
+  });
+
   it('should expose a request descriptor for httpResource', () => {
     const descriptor = service.listRequest({ search: 'VTE-000012', page: 2 });
 

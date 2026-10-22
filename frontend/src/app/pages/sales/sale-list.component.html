@@ -72,7 +72,7 @@
       <!-- Chargement -->
       <p class="sr-only" role="status">Chargement de l’historique des ventes…</p>
       <div class="overflow-x-auto" aria-hidden="true">
-        <table class="w-full min-w-[900px] text-left text-sm">
+        <table class="w-full min-w-[1000px] text-left text-sm">
           <tbody class="divide-y divide-emerald-800/30">
             @for (row of [1, 2, 3, 4, 5, 6]; track row) {
               <tr>
@@ -174,7 +174,7 @@
     } @else {
       <!-- Tableau -->
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
+        <table class="w-full min-w-[1000px] text-left text-sm">
           <caption class="sr-only">
             Historique des ventes
           </caption>
@@ -221,13 +221,37 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    (click)="openDetails(sale)"
-                    class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
-                  >
-                    Voir
-                  </button>
+                  <div class="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      (click)="openDetails(sale)"
+                      class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+                    >
+                      Voir
+                    </button>
+                    <button
+                      type="button"
+                      (click)="downloadInvoice(sale)"
+                      [disabled]="downloadingInvoiceId() !== null"
+                      class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <svg
+                        class="h-3.5 w-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                      {{ downloadingInvoiceId() === sale.id ? 'Génération…' : 'Facture PDF' }}
+                    </button>
+                  </div>
                 </td>
               </tr>
             }
@@ -431,8 +455,30 @@
 
         <!-- Actions -->
         <footer
-          class="flex items-center justify-end border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
         >
+          <button
+            type="button"
+            (click)="downloadInvoice(sale)"
+            [disabled]="downloadingInvoiceId() !== null"
+            class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-emerald-500/40 disabled:text-slate-300 disabled:shadow-none"
+          >
+            <svg
+              class="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+            {{ downloadingInvoiceId() === sale.id ? 'Génération…' : 'Facture PDF' }}
+          </button>
           <button
             type="button"
             (click)="closeDetails()"

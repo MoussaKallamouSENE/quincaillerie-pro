@@ -420,6 +420,82 @@ describe('Pos', () => {
     expect(toastService.toasts()[0]?.message).toContain('VTE-000012');
   });
 
+  it('should show the sale success modal with the invoice button', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    httpMock.expectOne(isSalesRequest).flush({ data: buildSale() });
+    await settle();
+
+    const text = normalizeSpaces(dialog()?.textContent ?? '');
+
+    expect(text).toContain('Vente enregistrée');
+    expect(text).toContain('VTE-000012');
+    expect(text).toContain('500,00');
+    expect(buttonStartingWith('Facture PDF')).toBeTruthy();
+
+    buttonStartingWith('Nouvelle vente')?.click();
+    fixture.detectChanges();
+
+    expect(dialog()).toBeNull();
+  });
+
+  it('should download the invoice of the sale that was just recorded', async () => {
+    // jsdom n'implemente pas le telechargement de blob : les URL temporaires
+    // et le clic sur le lien sont donc remplaces par des espions.
+    const createObjectURL = vi.fn(() => 'blob:facture');
+    const revokeObjectURL = vi.fn();
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectURL,
+      configurable: true,
+    });
+
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    httpMock.expectOne(isSalesRequest).flush({ data: buildSale() });
+    await settle();
+
+    buttonStartingWith('Facture PDF')?.click();
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne((candidate) =>
+      candidate.url.endsWith('/api/sales/12/invoice'),
+    );
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.responseType).toBe('blob');
+
+    const pdf = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    request.flush(pdf);
+    await settle();
+
+    expect(createObjectURL).toHaveBeenCalledWith(pdf);
+    expect(click).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:facture');
+
+    click.mockRestore();
+  });
+
   it('should refuse a credit sale without a customer', async () => {
     await flushSession(buildCashSession());
     await flushCatalogue([buildProduct()]);

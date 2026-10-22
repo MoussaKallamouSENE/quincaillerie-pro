@@ -1,7 +1,18 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
-import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { extractErrorMessage } from '../../core/http/api-error';
+import { downloadBlob } from '../../core/http/download-file';
+import { ToastService } from '../../core/toast/toast-service';
 import { SaleService } from '../../services/sale-service';
 import { PaymentMethod, PaymentStatus, Sale, SalesPage } from '../../services/sale.model';
 
@@ -60,6 +71,8 @@ const STATUS_CLASSES: Record<PaymentStatus, string> = {
 })
 export class SaleListComponent {
   private readonly saleService = inject(SaleService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly toastService = inject(ToastService);
 
   /** Terme de recherche saisi dans la barre de recherche. */
   protected readonly searchTerm = signal('');
@@ -75,6 +88,9 @@ export class SaleListComponent {
 
   /** Vente dont le detail est affiche dans la modale. */
   protected readonly selectedSale = signal<Sale | null>(null);
+
+  /** Vente dont la facture est en cours de generation. */
+  protected readonly downloadingInvoiceId = signal<number | null>(null);
 
   /** Historique des ventes, filtre et pagine par le backend. */
   protected readonly sales = httpResource<SalesPage>(() =>
@@ -194,6 +210,38 @@ export class SaleListComponent {
   /** Ferme la modale de detail. */
   protected closeDetails(): void {
     this.selectedSale.set(null);
+  }
+
+  /**
+   * Telecharge la facture PDF d'une vente.
+   *
+   * Le PDF arrive sous forme de blob : un lien temporaire declenche le
+   * telechargement, sans quitter la page.
+   *
+   * @param sale Vente dont la facture est demandee.
+   */
+  protected downloadInvoice(sale: Sale): void {
+    if (this.downloadingInvoiceId() !== null) {
+      return;
+    }
+
+    this.downloadingInvoiceId.set(sale.id);
+
+    this.saleService
+      .downloadInvoice(sale.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingInvoiceId.set(null);
+          downloadBlob(blob, `facture-${sale.reference}.pdf`);
+        },
+        error: (error: unknown) => {
+          this.downloadingInvoiceId.set(null);
+          this.toastService.error(
+            extractErrorMessage(error, 'Impossible de telecharger la facture.'),
+          );
+        },
+      });
   }
 
   /** Ferme la modale quand la touche Echap est pressee. */

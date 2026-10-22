@@ -252,6 +252,51 @@ describe('SaleListComponent', () => {
     expect(text).toContain('Marteau 500 g');
     expect(text).toContain('Espèces');
     expect(text).toContain('11 000,00');
+    expect(text).toContain('Facture PDF');
+  });
+
+  it('should download the invoice of a sale as a PDF', async () => {
+    await flushSales([buildSale()]);
+
+    // jsdom n'implemente pas le telechargement de blob : les URL temporaires
+    // et le clic sur le lien sont donc remplaces par des espions.
+    const createObjectURL = vi.fn(() => 'blob:facture');
+    const revokeObjectURL = vi.fn();
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectURL,
+      configurable: true,
+    });
+
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const button = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((candidate) => candidate.textContent?.trim() === 'Facture PDF');
+
+    button?.click();
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne((candidate) =>
+      candidate.url.endsWith('/api/sales/12/invoice'),
+    );
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.responseType).toBe('blob');
+
+    const pdf = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    request.flush(pdf);
+    await settle();
+
+    expect(createObjectURL).toHaveBeenCalledWith(pdf);
+    expect(click).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:facture');
+
+    click.mockRestore();
   });
 
   it('should close the details modal', async () => {

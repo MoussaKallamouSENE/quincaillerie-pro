@@ -785,6 +785,103 @@
   </div>
 }
 
+<!-- Modale : vente enregistree -->
+@if (completedSale(); as completed) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+    (click)="onCloseCompletedSale()"
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-sale-success-title"
+      class="w-full max-w-md rounded-2xl border border-emerald-800/60 bg-[#10261c] p-6 shadow-2xl shadow-black/60"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-start gap-3">
+        <span
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </span>
+
+        <div>
+          <h2 id="pos-sale-success-title" class="text-lg font-semibold text-slate-100">
+            Vente enregistrée
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">
+            La vente {{ completed.sale.reference }} a bien été enregistrée.
+          </p>
+        </div>
+      </div>
+
+      <dl class="mt-5 space-y-2 rounded-lg bg-emerald-950/40 p-4 text-sm">
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Montant total</dt>
+          <dd class="font-semibold text-slate-100">
+            {{ completed.sale.total_amount | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        <div class="flex items-center justify-between">
+          <dt class="text-slate-400">Montant payé</dt>
+          <dd class="font-medium text-emerald-300">
+            {{ completed.sale.paid_amount | number: '1.2-2' }} FCFA
+          </dd>
+        </div>
+        @if (completed.change > 0) {
+          <div class="flex items-center justify-between border-t border-emerald-900/60 pt-2">
+            <dt class="text-slate-400">Monnaie à rendre</dt>
+            <dd class="font-semibold text-emerald-300">
+              {{ completed.change | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
+        }
+      </dl>
+
+      <div class="mt-5 flex flex-col gap-2">
+        <button
+          type="button"
+          (click)="onDownloadInvoice()"
+          [disabled]="invoiceSubmitting()"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <svg
+            class="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+            />
+          </svg>
+          {{ invoiceSubmitting() ? 'Génération…' : 'Facture PDF' }}
+        </button>
+        <button
+          type="button"
+          (click)="onCloseCompletedSale()"
+          class="w-full rounded-lg border border-emerald-800/60 px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+        >
+          Nouvelle vente
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
 <!-- Modale : resume de la cloture -->
 @if (closingSummary(); as session) {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">

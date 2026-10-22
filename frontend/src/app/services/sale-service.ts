@@ -62,6 +62,18 @@ export class SaleService {
   }
 
   /**
+   * Telecharge la facture PDF d'une vente.
+   *
+   * `responseType: 'blob'` empeche Angular de deserialiser la reponse : les
+   * octets du PDF sont transmis tels quels au navigateur.
+   *
+   * @param saleId Identifiant de la vente.
+   */
+  downloadInvoice(saleId: number): Observable<Blob> {
+    return this.http.get(`${this.salesUrl}/${saleId}/invoice`, { responseType: 'blob' });
+  }
+
+  /**
    * Descripteur de requete `GET /api/sales`, consomme par `httpResource`.
    *
    * Les filtres restent dans cette couche : le composant consomme une

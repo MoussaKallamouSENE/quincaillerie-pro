@@ -27,7 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // Utilisateurs : accessible aux comptes autorises a gérer les comptes.
-    Route::apiResource('users', UserController::class);
+    Route::apiResource('users', UserController::class)->middleware('can:gerer_utilisateurs');
 
     // Caisse : une seule session ouverte par utilisateur.
     Route::post('/cash-sessions/open', [CashSessionController::class, 'open']);

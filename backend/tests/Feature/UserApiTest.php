@@ -77,8 +77,13 @@ class UserApiTest extends TestCase
     {
         $this->authenticateAs('Employé');
 
+        $target = User::factory()->create();
+
         $this->getJson('/api/users')->assertForbidden();
         $this->postJson('/api/users', $this->payload())->assertForbidden();
+        $this->getJson("/api/users/{$target->id}")->assertForbidden();
+        $this->putJson("/api/users/{$target->id}", $this->payload())->assertForbidden();
+        $this->deleteJson("/api/users/{$target->id}")->assertForbidden();
     }
 
     public function test_users_are_listed_with_their_role(): void

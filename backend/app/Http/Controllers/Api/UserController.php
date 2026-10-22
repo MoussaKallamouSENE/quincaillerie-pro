@@ -182,7 +182,7 @@ class UserController extends Controller
      */
     private function assertCanManageUsers(): void
     {
-        if (Gate::denies('manage-users')) {
+        if (Gate::denies('gerer_utilisateurs')) {
             throw new AuthorizationException('Vous n’avez pas la permission de gérer les utilisateurs.');
         }
     }

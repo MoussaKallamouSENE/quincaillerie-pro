@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Gestion des utilisateurs : reservee aux administrateurs et gerants,
         // ou a tout compte disposant explicitement de la permission.
-        Gate::define('manage-users', function (User $user): bool {
+        Gate::define('gerer_utilisateurs', function (User $user): bool {
             return $user->hasAnyRole(['Admin', 'Gérant'])
                 || $user->getAllPermissions()->contains('name', 'gerer_utilisateurs');
         });

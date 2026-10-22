@@ -17,7 +17,7 @@ class StoreUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return Gate::allows('manage-users');
+        return Gate::allows('gerer_utilisateurs');
     }
 
     /**

@@ -3,7 +3,13 @@
   <div class="flex flex-wrap items-end justify-between gap-4">
     <div>
       <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Tableau de bord</h1>
-      <p class="mt-1 text-sm text-slate-400">Bienvenue sur la gestion de votre quincaillerie</p>
+      <p class="mt-1 text-sm text-slate-400">
+        @if (auth.displayName()) {
+          Bonjour {{ auth.displayName() }}, bienvenue sur la gestion de votre quincaillerie
+        } @else {
+          Bienvenue sur la gestion de votre quincaillerie
+        }
+      </p>
     </div>
 
     <div class="flex items-center gap-2">
@@ -27,8 +33,8 @@
         </svg>
         Exporter
       </button>
-      <button
-        type="button"
+      <a
+        routerLink="/pos"
         class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
       >
         <svg
@@ -42,12 +48,30 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
         Nouvelle vente
-      </button>
+      </a>
     </div>
   </div>
 
+  <!-- Erreur de chargement des statistiques -->
+  @if (stats.error()) {
+    <div class="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+      <p class="text-sm font-medium text-red-300">Statistiques indisponibles</p>
+      <p class="mt-1 text-xs text-slate-300">{{ statsErrorMessage() }}</p>
+      <button
+        type="button"
+        (click)="reloadStats()"
+        class="mt-3 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+      >
+        Réessayer
+      </button>
+    </div>
+  }
+
   <!-- Cartes KPI -->
-  <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <div
+    class="mt-6 grid gap-4 sm:grid-cols-2"
+    [class]="canViewRevenue() ? 'xl:grid-cols-4' : 'xl:grid-cols-3'"
+  >
     @for (kpi of kpis(); track kpi.label) {
       <article
         class="rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30 transition hover:border-emerald-700/60"
@@ -85,76 +109,135 @@
           </span>
         </div>
 
-        <p class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          @if (kpi.trend) {
-            <span
-              class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-400"
-            >
-              <svg
-                class="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.281m5.94 2.28l-2.28 5.941"
-                />
-              </svg>
-              {{ kpi.trend }}
-            </span>
-          }
-          {{ kpi.detail }}
-        </p>
+        <p class="mt-3 text-xs text-slate-400">{{ kpi.detail }}</p>
       </article>
     }
   </div>
 
-  <!-- Zone centrale : graphique + alertes -->
+  <!-- Zone centrale : graphique (ou activite de l'employe) + alertes -->
   <div class="mt-6 grid gap-6 lg:grid-cols-3">
-    <!-- Graphique -->
-    <section
-      class="rounded-xl border border-emerald-800/50 bg-[#153322] p-6 shadow-lg shadow-emerald-950/30 lg:col-span-2"
-    >
-      <header class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-slate-100">Évolution des ventes</h2>
-          <p class="mt-1 text-sm text-slate-400">Chiffre d’affaires des 7 derniers jours</p>
-        </div>
-        <span
-          class="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/25"
-        >
-          7 derniers jours
-        </span>
-      </header>
-
-      <div
-        class="mt-6 flex h-56 items-end gap-3 rounded-lg bg-emerald-950/30 px-4 pt-6 pb-3"
-        role="list"
-        aria-label="Chiffre d'affaires des 7 derniers jours"
+    @if (canViewRevenue()) {
+      <!-- Graphique -->
+      <section
+        class="rounded-xl border border-emerald-800/50 bg-[#153322] p-6 shadow-lg shadow-emerald-950/30 lg:col-span-2"
       >
-        @for (point of salesChart(); track point.day) {
-          <div
-            class="flex h-full flex-1 flex-col items-center justify-end gap-2"
-            role="listitem"
-            [attr.aria-label]="point.day + ' : ' + point.amount + ' FCFA'"
+        <header class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-slate-100">Évolution des ventes</h2>
+            <p class="mt-1 text-sm text-slate-400">Chiffre d’affaires des 7 derniers jours</p>
+          </div>
+          <span
+            class="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/25"
           >
-            <span class="text-xs font-semibold text-emerald-400">
-              {{ point.amount / 1000 | number: '1.0-0' }} k
-            </span>
-            <div
-              class="w-full rounded-t-lg bg-emerald-500 transition hover:bg-emerald-400"
-              [style.height.%]="point.height"
-              aria-hidden="true"
-            ></div>
-            <span class="text-xs text-slate-400">{{ point.day }}</span>
+            7 derniers jours
+          </span>
+        </header>
+
+        @if (stats.isLoading() && !stats.hasValue()) {
+          <!-- Chargement -->
+          <p class="sr-only" role="status">Chargement du graphique des ventes…</p>
+          <div
+            class="mt-6 flex h-56 items-end gap-3 rounded-lg bg-emerald-950/30 px-4 pt-6 pb-3"
+            aria-hidden="true"
+          >
+            @for (height of [45, 70, 35, 90, 60, 80, 50]; track $index) {
+              <div class="flex h-full flex-1 items-end">
+                <div
+                  class="w-full animate-pulse rounded-t-lg bg-emerald-800/50"
+                  [style.height.%]="height"
+                ></div>
+              </div>
+            }
+          </div>
+        } @else if (salesChart().length === 0) {
+          <!-- Aucune vente sur la periode -->
+          <div
+            class="mt-6 rounded-lg border border-emerald-800/40 bg-emerald-950/40 p-10 text-center"
+          >
+            <p class="text-sm font-medium text-emerald-300">Aucune vente sur la période</p>
+            <p class="mt-1 text-xs text-slate-400">
+              Les ventes enregistrées apparaîtront ici dès aujourd’hui.
+            </p>
+          </div>
+        } @else {
+          <div
+            class="mt-6 flex h-56 items-end gap-3 rounded-lg bg-emerald-950/30 px-4 pt-6 pb-3"
+            role="list"
+            aria-label="Chiffre d'affaires des 7 derniers jours"
+          >
+            @for (point of salesChart(); track point.date) {
+              <div
+                class="flex h-full flex-1 flex-col items-center justify-end gap-2"
+                role="listitem"
+                [attr.aria-label]="point.label + ' : ' + point.amount + ' FCFA'"
+              >
+                <span class="text-xs font-semibold text-emerald-400">
+                  {{ point.compactAmount }}
+                </span>
+                <div
+                  class="w-full rounded-t-lg bg-emerald-500 transition hover:bg-emerald-400"
+                  [style.height.%]="point.height"
+                  aria-hidden="true"
+                ></div>
+                <span class="text-xs text-slate-400">{{ point.label }}</span>
+              </div>
+            }
           </div>
         }
-      </div>
-    </section>
+      </section>
+    } @else {
+      <!-- Activite de l'employe : pas de chiffre d'affaires ni de graphique -->
+      <section
+        class="rounded-xl border border-emerald-800/50 bg-[#153322] p-6 shadow-lg shadow-emerald-950/30 lg:col-span-2"
+      >
+        <header>
+          <h2 class="text-base font-semibold text-slate-100">
+            Bonjour {{ auth.displayName() || 'à vous' }}
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">
+            Voici l’activité de la quincaillerie aujourd’hui.
+          </p>
+        </header>
+
+        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-lg border border-emerald-800/40 bg-emerald-950/40 p-4">
+            <p class="text-xs font-medium tracking-wider text-slate-400 uppercase">
+              Ventes enregistrées
+            </p>
+            <p class="mt-2 text-3xl font-semibold text-emerald-300">{{ todaySalesCount() }}</p>
+            <p class="mt-1 text-xs text-slate-400">aujourd’hui</p>
+          </div>
+
+          <div class="rounded-lg border border-emerald-800/40 bg-emerald-950/40 p-4">
+            <p class="text-xs font-medium tracking-wider text-slate-400 uppercase">
+              Alertes de stock
+            </p>
+            <p class="mt-2 text-3xl font-semibold text-red-400">{{ lowStockCount() ?? '—' }}</p>
+            <p class="mt-1 text-xs text-slate-400">produits sous le seuil</p>
+          </div>
+        </div>
+
+        <p
+          class="mt-6 inline-flex items-center gap-2 rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-3 py-2 text-xs text-slate-400"
+        >
+          <svg
+            class="h-4 w-4 shrink-0 text-emerald-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+            />
+          </svg>
+          Le chiffre d’affaires et le graphique des ventes sont réservés aux responsables.
+        </p>
+      </section>
+    }
 
     <!-- Alertes de stock -->
     <section
@@ -254,8 +337,8 @@
         <p class="mt-1 text-sm text-slate-400">Les 5 dernières transactions enregistrées</p>
       </div>
 
-      <button
-        type="button"
+      <a
+        routerLink="/sales"
         class="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400 transition hover:text-emerald-300"
       >
         Voir tout
@@ -273,11 +356,11 @@
             d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
           />
         </svg>
-      </button>
+      </a>
     </header>
 
     <div class="overflow-x-auto">
-      <table class="w-full min-w-[640px] text-left text-sm">
+      <table class="w-full min-w-[720px] text-left text-sm">
         <caption class="sr-only">
           Dernières ventes enregistrées
         </caption>
@@ -287,6 +370,7 @@
             class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
           >
             <th scope="col" class="px-6 py-3 font-medium">Référence</th>
+            <th scope="col" class="px-6 py-3 font-medium">Date</th>
             <th scope="col" class="px-6 py-3 font-medium">Client</th>
             <th scope="col" class="px-6 py-3 text-right font-medium">Montant</th>
             <th scope="col" class="px-6 py-3 text-right font-medium">Statut</th>
@@ -294,32 +378,58 @@
         </thead>
 
         <tbody class="divide-y divide-emerald-800/30">
-          @for (sale of recentSales; track sale.reference) {
-            <tr class="transition hover:bg-emerald-900/30">
-              <td class="px-6 py-4 font-medium text-emerald-400">{{ sale.reference }}</td>
-              <td class="px-6 py-4 text-slate-200">{{ sale.client }}</td>
-              <td class="px-6 py-4 text-right text-slate-200">
-                {{ sale.amount | number }}
-                <span class="text-slate-400">FCFA</span>
-              </td>
-              <td class="px-6 py-4 text-right">
-                @if (sale.status === 'paid') {
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/25"
-                  >
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
-                    Payé
-                  </span>
-                } @else {
-                  <span
-                    class="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-medium text-yellow-400 ring-1 ring-yellow-500/25"
-                  >
-                    <span class="h-1.5 w-1.5 rounded-full bg-yellow-400" aria-hidden="true"></span>
-                    En attente
-                  </span>
-                }
+          @if (stats.isLoading() && !stats.hasValue()) {
+            <!-- Chargement -->
+            @for (row of [1, 2, 3, 4, 5]; track row) {
+              <tr aria-hidden="true">
+                <td class="px-6 py-4">
+                  <div class="h-4 w-24 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-4 w-28 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-4 w-32 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-4 w-20 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="ml-auto h-4 w-16 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+              </tr>
+            }
+          } @else if (recentSales().length === 0) {
+            <!-- Aucune vente -->
+            <tr>
+              <td colspan="5" class="px-6 py-10 text-center text-sm text-slate-400">
+                Aucune vente enregistrée pour le moment.
               </td>
             </tr>
+          } @else {
+            @for (sale of recentSales(); track sale.id) {
+              <tr class="transition hover:bg-emerald-900/30">
+                <td class="px-6 py-4 font-medium text-slate-100">{{ sale.reference }}</td>
+                <td class="px-6 py-4 text-slate-400">
+                  {{ sale.created_at | date: 'dd/MM/yyyy HH:mm' }}
+                </td>
+                <td class="px-6 py-4 text-slate-300">
+                  {{ sale.customer_name ?? 'Passage' }}
+                </td>
+                <td class="px-6 py-4 text-right font-semibold text-slate-100">
+                  {{ sale.total_amount | number: '1.2-2' }}
+                  <span class="text-xs font-normal text-slate-500">FCFA</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <span
+                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
+                    [class]="statusClasses(sale.payment_status)"
+                  >
+                    {{ statusLabel(sale.payment_status) }}
+                  </span>
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>

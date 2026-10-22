@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\CustomerFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Customer extends Model
 {
+    /** @use HasFactory<CustomerFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'phone',
@@ -22,5 +27,8 @@ class Customer extends Model
         'is_active' => 'boolean',
     ];
 
-        public function sales() { return $this->hasMany(Sale::class); }
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
 }

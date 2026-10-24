@@ -6,20 +6,10 @@ import { ToastContainer } from '../core/toast/toast-container';
 
 /** Entree du menu lateral. */
 interface NavItem {
-  /** Libelle affiche. */
   readonly label: string;
-  /** Trace SVG (Heroicons, 24x24) de l'icone de l'entree. */
   readonly icon: string;
-  /**
-   * Route du module.
-   *
-   * `null` pour les modules qui ne sont pas encore developpes : l'entree est
-   * alors rendue comme un bouton inactif.
-   */
   readonly path: string | null;
-  /** Permission Spatie exigee pour voir l'entree (alternative aux roles). */
   readonly permission?: string;
-  /** Roles autorises a voir l'entree. */
   readonly roles?: readonly string[];
 }
 
@@ -41,9 +31,14 @@ const NAV_ITEMS: readonly NavItem[] = [
     icon: 'm21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9',
   },
   {
-    label: 'Stock',
-    path: null,
+    label: 'Stock', // <--- LE LIEN EST MAINTENANT ACTIF
+    path: '/stock', // <--- ON A MIS LE CHEMIN ICI
     icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
+  },
+  {
+    label: 'Achats',
+    path: '/purchases',
+    icon: 'M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z',
   },
   {
     label: 'Historique Ventes',
@@ -64,8 +59,6 @@ const NAV_ITEMS: readonly NavItem[] = [
     label: 'Utilisateurs',
     path: '/users',
     icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z',
-    // Entree reservee aux admins et aux gerants : un employe ne doit pas la
-    // voir.
     roles: ['Admin', 'Gérant'],
   },
   {
@@ -80,11 +73,6 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
 ];
 
-/**
- * Coquille de l'application : barre laterale, barre superieure et contenu.
- *
- * Toutes les pages authentifiees sont rendues dans le `<router-outlet>`.
- */
 @Component({
   selector: 'app-layout',
   imports: [DatePipe, RouterLink, RouterLinkActive, RouterOutlet, ToastContainer],
@@ -95,42 +83,28 @@ export class Layout implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  /** Date du jour, affichee dans la barre superieure. */
   protected readonly today = new Date();
 
-  /**
-   * Menu lateral filtre selon les droits de l'utilisateur connecte.
-   *
-   * Une entree sans restriction est toujours visible ; une entree restreinte
-   * l'est si l'utilisateur possede la permission ou l'un des roles demandes.
-   * Tant que le profil n'est pas charge, les entrees restreintes sont masquees.
-   */
   protected readonly visibleNavItems = computed(() =>
     NAV_ITEMS.filter((item) => this.canSeeNavItem(item)),
   );
 
-  /** Vrai quand la barre laterale est ouverte sur mobile. */
   protected readonly sidebarOpen = signal(false);
 
   ngOnInit(): void {
-    // La page de connexion enregistre le jeton ; le profil complet n'est
-    // charge qu'ici, via `GET /api/me`.
     if (this.auth.isAuthenticated() && !this.auth.user()) {
       void this.auth.refreshProfile().catch(() => undefined);
     }
   }
 
-  /** Ouvre la barre laterale (mobile). */
   protected openSidebar(): void {
     this.sidebarOpen.set(true);
   }
 
-  /** Ferme la barre laterale (mobile). */
   protected closeSidebar(): void {
     this.sidebarOpen.set(false);
   }
 
-  /** Vrai si l'entree du menu est visible pour l'utilisateur connecte. */
   private canSeeNavItem(item: NavItem): boolean {
     if (!item.permission && !item.roles?.length) {
       return true;
@@ -142,7 +116,6 @@ export class Layout implements OnInit {
     return hasPermission || hasRole;
   }
 
-  /** Deconnecte l'utilisateur et revient a la page de connexion. */
   protected async onSignOut(): Promise<void> {
     await this.auth.signOut();
     await this.router.navigate(['/login']);

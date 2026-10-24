@@ -1,0 +1,154 @@
+<div class="p-6 bg-[#0a1912] min-h-screen text-slate-200">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-emerald-400">Achats / Réapprovisionnement</h1>
+    @if (canManagePurchases()) {
+      <button
+        (click)="openModal()"
+        class="bg-emerald-600 px-4 py-2 rounded-lg text-sm font-medium text-white hover:bg-emerald-500 transition shadow-md"
+      >
+        Nouvel Achat
+      </button>
+    }
+  </div>
+
+  <div class="bg-[#153322] rounded-xl border border-emerald-800/50 p-6 shadow-lg">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="text-emerald-500 border-b border-emerald-800/50 text-sm uppercase tracking-wider">
+            <th class="p-3">Référence</th>
+            <th class="p-3">Date</th>
+            <th class="p-3">Fournisseur</th>
+            <th class="p-3">Montant Total</th>
+            <th class="p-3">Statut</th>
+            <th class="p-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (purchase of purchases(); track purchase.id) {
+            <tr class="border-b border-emerald-800/20 hover:bg-emerald-900/20 transition">
+              <td class="p-3 font-medium">{{ purchase.reference }}</td>
+              <td class="p-3 text-slate-400">{{ purchase.created_at | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td class="p-3">{{ purchase.supplier?.name || '-' }}</td>
+              <td class="p-3 font-bold text-emerald-400">{{ purchase.total_amount | number: '1.2-2' }} FCFA</td>
+              <td class="p-3">
+                <span class="px-2 py-1 rounded text-xs font-bold" [class]="getStatusClass(purchase.status)">
+                  {{ getStatusLabel(purchase.status) }}
+                </span>
+              </td>
+              <td class="p-3 text-right">
+                @if (purchase.status === 'pending' && canManagePurchases()) {
+                  <button
+                    (click)="receivePurchase(purchase)"
+                    class="bg-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium text-white hover:bg-emerald-500 transition shadow-md"
+                  >
+                    Réceptionner
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+          @if (purchases().length === 0 && !loading()) {
+            <tr>
+              <td colspan="6" class="p-4 text-center text-slate-400">Aucun achat trouvé.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  @if (showModal()) {
+    <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+      <div class="bg-[#153322] p-6 rounded-2xl w-full max-w-3xl border border-emerald-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-xl font-bold mb-4 text-white">Nouvel Achat</h3>
+
+        <div class="mb-4">
+          <label class="block mb-2 text-sm text-slate-300">Fournisseur</label>
+          <select
+            [(ngModel)]="supplierId"
+            class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+          >
+            <option [ngValue]="null">Sélectionner un fournisseur</option>
+            @for (supplier of suppliers(); track supplier.id) {
+              <option [ngValue]="supplier.id">{{ supplier.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm text-slate-300">Produits</label>
+            <button
+              (click)="addLine()"
+              type="button"
+              class="text-sm text-emerald-400 hover:text-emerald-300"
+            >
+              + Ajouter un produit
+            </button>
+          </div>
+
+          <div class="space-y-2">
+            @for (line of lines; track $index) {
+              <div class="grid grid-cols-12 gap-2">
+                <select
+                  [(ngModel)]="line.product_id"
+                  (change)="onProductChange(line)"
+                  class="col-span-5 p-2 bg-[#0a1912] rounded-lg border border-emerald-800 text-white text-sm"
+                >
+                  <option [ngValue]="null">Produit</option>
+                  @for (product of products(); track product.id) {
+                    <option [ngValue]="product.id">{{ product.name }}</option>
+                  }
+                </select>
+                <input
+                  type="number"
+                  [(ngModel)]="line.quantity"
+                  min="1"
+                  placeholder="Qté"
+                  class="col-span-2 p-2 bg-[#0a1912] rounded-lg border border-emerald-800 text-white text-sm"
+                />
+                <input
+                  type="number"
+                  [(ngModel)]="line.unit_price"
+                  min="0"
+                  step="0.01"
+                  placeholder="Prix unitaire"
+                  class="col-span-3 p-2 bg-[#0a1912] rounded-lg border border-emerald-800 text-white text-sm"
+                />
+                <button
+                  (click)="removeLine($index)"
+                  type="button"
+                  class="col-span-2 text-red-400 hover:text-red-300 text-sm"
+                >
+                  Supprimer
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="mb-6 text-right">
+          <span class="text-slate-300">Total : </span>
+          <span class="text-xl font-bold text-emerald-400">{{ total | number: '1.2-2' }} FCFA</span>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button
+            (click)="closeModal()"
+            class="px-5 py-2 rounded-lg text-slate-300 hover:bg-emerald-900/50 transition"
+          >
+            Annuler
+          </button>
+          <button
+            (click)="createPurchase()"
+            [disabled]="submitting()"
+            class="px-5 py-2 bg-emerald-600 rounded-lg text-white font-medium hover:bg-emerald-500 transition disabled:opacity-50"
+          >
+            {{ submitting() ? 'Création...' : 'Créer la commande' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -52,6 +52,17 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/suppliers/supplier-list').then((m) => m.SupplierList),
         title: 'Fournisseurs - Quincaillerie Pro',
       },
+      // >>> AJOUT DE LA ROUTE STOCK ICI <<<
+      {
+        path: 'stock',
+        loadComponent: () => import('./pages/stock/stock-list/stock-list').then((m) => m.StockListComponent),
+        title: 'Stock - Quincaillerie Pro',
+      },
+      {
+        path: 'purchases',
+        loadComponent: () => import('./pages/purchases/purchase-list').then((m) => m.PurchaseListComponent),
+        title: 'Achats - Quincaillerie Pro',
+      },
       {
         // Reserve aux administrateurs et aux gerants.
         path: 'users',

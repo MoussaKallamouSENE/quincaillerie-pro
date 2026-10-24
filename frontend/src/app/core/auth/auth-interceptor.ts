@@ -6,19 +6,22 @@ import { AuthService } from './auth-service';
 
 /**
  * Ajoute le jeton Bearer a toutes les requetes sortantes, sauf la connexion.
- *
- * Le jeton est lu depuis `AuthService` a chaque requete : pas de copie locale,
- * donc pas de desynchronisation possible avec le service.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const auth = inject(AuthService);
-  const token = auth.token();
+  let token = localStorage.getItem('token');
+  if (!token) {
+    token = localStorage.getItem('quincaillerie.token');
+    if (token) {
+      localStorage.setItem('token', token);
+      localStorage.removeItem('quincaillerie.token');
+    }
+  }
 
   if (!token || isLoginEndpoint(req.url)) {
     return next(req);
   }
 
-  return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
+  return next(req.clone({ setHeaders: { Authorization: 'Bearer ' + token } }));
 };
 
 /**

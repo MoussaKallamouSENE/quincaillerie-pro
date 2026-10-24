@@ -14,7 +14,7 @@ describe('authInterceptor', () => {
   beforeEach(() => {
     localStorage.clear();
     // Le store relit le jeton depuis le localStorage a sa construction.
-    localStorage.setItem('quincaillerie.token', 'token-xyz');
+    localStorage.setItem('token', 'token-xyz');
 
     router = { navigate: vi.fn(), url: '/products' };
 

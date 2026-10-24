@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UnitController;
@@ -47,4 +48,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // Listes de référence du catalogue, utilisées par le formulaire produit.
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/units', [UnitController::class, 'index']);
+
+    // L'employé peut voir l'historique
+    Route::get('/stock-movements', [App\Http\Controllers\Api\StockMovementController::class, 'index']);
+
+    // Seul le gérant/admin peut faire un ajustement
+    Route::post('/stock-movements', [App\Http\Controllers\Api\StockMovementController::class, 'store'])
+        ->middleware('can:ajuster_stock');
+
+    // Achats / Réapprovisionnement
+    Route::get('/purchases', [PurchaseController::class, 'index'])
+             ->middleware('role:Admin|Gérant');
+    Route::post('/purchases', [PurchaseController::class, 'store']);
+    Route::post('/purchases/{id}/receive', [PurchaseController::class, 'receive']);
 });

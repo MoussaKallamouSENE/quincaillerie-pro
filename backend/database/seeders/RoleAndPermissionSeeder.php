@@ -26,10 +26,22 @@ class RoleAndPermissionSeeder extends Seeder
 
         // Permission de gestion des comptes : accordée aux profils qui peuvent
         // créer, modifier ou désactiver les utilisateurs.
-        $gererUtilisateurs = Permission::firstOrCreate(['name' => 'gerer_utilisateurs']);
+
+        $gererUtilisateurs = Permission::firstOrCreate([
+            'name' => 'gerer_utilisateurs',
+            'guard_name' => 'web',
+        ]);
+
+        $ajusterStock = Permission::firstOrCreate([
+            'name' => 'ajuster_stock',
+            'guard_name' => 'web',
+        ]);
+
         $admin->givePermissionTo($gererUtilisateurs);
         $gerant->givePermissionTo($gererUtilisateurs);
 
+        $admin->givePermissionTo($ajusterStock);
+        $gerant->givePermissionTo($ajusterStock);
         // Créer le SuperAdmin user
         $superAdmin = User::firstOrCreate(
             ['email' => 'superadmin@quincaillerie.com'],

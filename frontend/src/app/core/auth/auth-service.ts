@@ -12,14 +12,28 @@ import { AuthUser, LoginCredentials, LoginResponse } from './auth.model';
  * (le frontend et l'API sont sur des origines distinctes en developpement).
  * A arbitrer lors du passage en production.
  */
-const TOKEN_STORAGE_KEY = 'quincaillerie.token';
+const TOKEN_STORAGE_KEY = 'token';
 
 /** Etat d'authentification expose a l'interface. */
 export type AuthStatus = 'anonymous' | 'authenticating' | 'authenticated';
 
 function readStoredToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (token) {
+      return token;
+    }
+    const legacyToken = localStorage.getItem('quincaillerie.token');
+    if (legacyToken) {
+      try {
+        localStorage.setItem(TOKEN_STORAGE_KEY, legacyToken);
+        localStorage.removeItem('quincaillerie.token');
+      } catch {
+        // ignore
+      }
+      return legacyToken;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -37,6 +51,7 @@ function writeStoredToken(token: string): void {
 function removeStoredToken(): void {
   try {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem('quincaillerie.token');
   } catch {
     // Rien a faire.
   }

@@ -1,5 +1,6 @@
 <?php
 
+use Spatie\Permission\Middleware\RoleMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,10 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
-        // L'application est une API pure : elle ne possede pas de page de
-        // connexion. Sans cette redite, un visiteur non authentifie
-        // declenche une erreur 500 ("Route [login] not defined") au lieu de
-        // recevoir une reponse 401 JSON.
+        $middleware->alias([
+            'role' => RoleMiddleware::class,
+        ]);
+
+        // L'application est une API pure : elle ne possède pas de page de
+        // connexion. Les visiteurs non authentifiés reçoivent une réponse 401 JSON.
         $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

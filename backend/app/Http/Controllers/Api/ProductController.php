@@ -7,10 +7,13 @@ use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProductController extends Controller
@@ -59,7 +62,24 @@ class ProductController extends Controller
      */
     public function store(StoreProductRequest $request): JsonResponse
     {
-        $product = Product::create($request->validated());
+        $product = DB::transaction(function () use ($request): Product {
+            $product = Product::create($request->validated());
+
+            $initialStock = (int) $product->stock_quantity;
+
+            if ($initialStock > 0) {
+                StockMovement::create([
+                    'product_id' => $product->id,
+                    'user_id' => $request->user()->id,
+                    'type' => 'in',
+                    'quantity' => $initialStock,
+                    'reference' => 'INIT-'.$product->sku,
+                    'note' => 'Stock initial à la création du produit',
+                ]);
+            }
+
+            return $product;
+        });
 
         // Le modele en memoire ignore les valeurs par defaut de la base
         // (`is_active`) : il est recharge pour que la reponse soit fidele.
@@ -83,7 +103,38 @@ class ProductController extends Controller
      */
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
     {
-        $product->update($request->validated());
+        $product = DB::transaction(function () use ($request, $product): Product {
+            $lockedProduct = Product::query()
+                ->lockForUpdate()
+                ->findOrFail($product->id);
+
+            $data = $request->validated();
+            $before = (int) $lockedProduct->stock_quantity;
+
+            $lockedProduct->update($data);
+
+            if (array_key_exists('stock_quantity', $data)) {
+                $after = (int) $lockedProduct->stock_quantity;
+                $delta = $after - $before;
+
+                if ($delta !== 0) {
+                    StockMovement::create([
+                        'product_id' => $lockedProduct->id,
+                        'user_id' => $request->user()->id,
+                        'type' => 'adjustment',
+                        'quantity' => $delta,
+                        'reference' => 'MVT-'.Str::upper(Str::random(10)),
+                        'note' => sprintf(
+                            'Modification de la fiche produit (stock : %d -> %d)',
+                            $before,
+                            $after,
+                        ),
+                    ]);
+                }
+            }
+
+            return $lockedProduct;
+        });
 
         return ProductResource::make($product->load(['category', 'unit']))
             ->response()
@@ -92,9 +143,23 @@ class ProductController extends Controller
 
     /**
      * Remove the specified product.
+     *
+     * Un produit rattache a l'historique (vente, achat ou mouvement de stock)
+     * ne peut pas etre supprime : il doit etre desactive pour conserver la
+     * tracabilite.
      */
     public function destroy(Product $product): JsonResponse
     {
+        if (
+            $product->saleItems()->exists()
+            || $product->purchaseItems()->exists()
+            || $product->stockMovements()->exists()
+        ) {
+            return response()->json([
+                'message' => 'Ce produit possède un historique (ventes, achats ou mouvements). Désactivez-le plutôt que de le supprimer.',
+            ], Response::HTTP_CONFLICT);
+        }
+
         $product->delete();
 
         return response()->json([

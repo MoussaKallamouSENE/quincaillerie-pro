@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreSalePaymentRequest;
 use App\Http\Requests\StoreSaleRequest;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
@@ -79,11 +80,19 @@ class SaleController extends Controller
      * are loaded with the sale, so that the invoice can be printed as a single
      * document.
      */
-    public function downloadInvoice(int $sale): Response
+    public function downloadInvoice(Request $request, int $sale): Response
     {
         $model = Sale::query()
             ->with(['customer', 'user', 'items.product', 'payments'])
             ->findOrFail($sale);
+
+        $user = $request->user();
+
+        abort_unless(
+            $user->hasAnyRole(['Admin', 'Gérant']) || $model->user_id === $user->id,
+            Response::HTTP_FORBIDDEN,
+            'Vous ne pouvez pas consulter la facture de cette vente.',
+        );
 
         return Pdf::loadView('pdf.invoice', ['sale' => $model])
             ->setPaper('a4', 'portrait')
@@ -99,6 +108,22 @@ class SaleController extends Controller
     public function store(StoreSaleRequest $request): JsonResponse
     {
         $sale = $this->saleService->createSale($request->validated(), $request->user());
+
+        return SaleResource::make($sale)
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    /**
+     * Enregistre un règlement ultérieur sur une vente à crédit.
+     */
+    public function addPayment(StoreSalePaymentRequest $request, Sale $sale): JsonResponse
+    {
+        $sale = $this->saleService->addPayment(
+            $sale,
+            $request->validated(),
+            $request->user(),
+        );
 
         return SaleResource::make($sale)
             ->response()

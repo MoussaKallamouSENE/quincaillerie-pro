@@ -34,7 +34,8 @@ class StoreSaleRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['sometimes', 'nullable', 'numeric', 'gt:0'],
+            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:64'],
             'payment' => ['sometimes', 'nullable', 'array'],
             'payment.method' => ['required_with:payment', 'string', 'in:cash,wave,orange_money,bank_transfer,check'],
             'payment.amount' => ['required_with:payment', 'numeric', 'min:0'],
@@ -58,7 +59,7 @@ class StoreSaleRequest extends FormRequest
             'items.*.quantity.required' => 'La quantité est obligatoire.',
             'items.*.quantity.min' => 'La quantité doit être supérieure à zéro.',
             'items.*.unit_price.numeric' => 'Le prix unitaire doit être un nombre.',
-            'items.*.unit_price.min' => 'Le prix unitaire ne peut pas être négatif.',
+            'items.*.unit_price.gt' => 'Le prix unitaire doit être supérieur à zéro.',
             'payment.method.required' => 'Le mode de paiement est obligatoire.',
             'payment.method.in' => 'Le mode de paiement est invalide.',
             'payment.amount.required' => 'Le montant payé est obligatoire.',
@@ -81,6 +82,7 @@ class StoreSaleRequest extends FormRequest
             'payment.method' => 'mode de paiement',
             'payment.amount' => 'montant payé',
             'payment.reference' => 'référence du paiement',
+            'idempotency_key' => 'clé d’idempotence',
         ];
     }
 }

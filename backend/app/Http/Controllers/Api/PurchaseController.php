@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class PurchaseController extends Controller
@@ -53,7 +54,7 @@ class PurchaseController extends Controller
             $purchase = Purchase::create([
                 'supplier_id' => $validated['supplier_id'],
                 'user_id' => $request->user()?->id,
-                'reference' => 'ACH-' . strtoupper(Str::random(8)),
+                'reference' => 'ACH-'.strtoupper(Str::random(8)),
                 'total_amount' => $totalAmount,
                 'status' => 'pending',
             ]);
@@ -125,7 +126,7 @@ class PurchaseController extends Controller
                         'type' => 'in',
                         'quantity' => $item->quantity,
                         'reference' => $purchase->reference,
-                        'note' => 'Réception commande ' . $purchase->reference,
+                        'note' => 'Réception commande '.$purchase->reference,
                     ]);
                 }
             }
@@ -152,4 +153,103 @@ class PurchaseController extends Controller
         ]);
     }
 
+    /**
+     * Afficher le détail d'une commande d'achat.
+     */
+    public function show(Purchase $purchase): JsonResponse
+    {
+        $purchase->load([
+            'supplier',
+            'user',
+            'items.product',
+            'receptions.user',
+        ]);
+
+        return response()->json($purchase);
+    }
+
+    /**
+     * Annuler une commande d'achat.
+     *
+     * Une commande en attente est simplement marquée annulée. Une commande
+     * déjà réceptionnée est annulée en reversant le stock reçu, dans la même
+     * transaction et sous verrou, avec un mouvement de sortie par ligne.
+     */
+    public function cancel(Request $request, Purchase $purchase): JsonResponse
+    {
+        $result = DB::transaction(function () use ($purchase, $request): array {
+            $purchase = Purchase::query()
+                ->lockForUpdate()
+                ->with('items')
+                ->findOrFail($purchase->id);
+
+            if ($purchase->status === 'cancelled') {
+                return [
+                    'cancelled' => false,
+                    'purchase' => $purchase,
+                ];
+            }
+
+            if ($purchase->status === 'received') {
+                foreach ($purchase->items as $item) {
+                    $product = Product::query()
+                        ->lockForUpdate()
+                        ->find($item->product_id);
+
+                    if ($product === null) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Un produit de cette commande n’existe plus.',
+                        ]);
+                    }
+
+                    if ($product->stock_quantity < $item->quantity) {
+                        throw ValidationException::withMessages([
+                            'items' => sprintf(
+                                'Stock insuffisant pour annuler la commande : %s (%d disponible(s), %d à retirer).',
+                                $product->name,
+                                $product->stock_quantity,
+                                $item->quantity,
+                            ),
+                        ]);
+                    }
+
+                    $product->decrement('stock_quantity', $item->quantity);
+
+                    StockMovement::create([
+                        'product_id' => $product->id,
+                        'user_id' => $request->user()->id,
+                        'type' => 'out',
+                        'quantity' => -$item->quantity,
+                        'reference' => $purchase->reference,
+                        'note' => 'Annulation commande '.$purchase->reference,
+                    ]);
+                }
+            }
+
+            $purchase->update(['status' => 'cancelled']);
+
+            return [
+                'cancelled' => true,
+                'purchase' => $purchase,
+            ];
+        });
+
+        if (! $result['cancelled']) {
+            return response()->json([
+                'message' => 'Cette commande est déjà annulée.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $result['purchase']->load([
+            'supplier',
+            'user',
+            'items.product',
+            'receptions.user',
+        ]);
+
+        return response()->json([
+            'message' => 'Commande annulée avec succès.',
+            'purchase' => $result['purchase'],
+        ]);
+    }
 }

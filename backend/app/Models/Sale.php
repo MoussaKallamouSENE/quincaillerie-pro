@@ -11,7 +11,7 @@ class Sale extends Model
     /** @use HasFactory<SaleFactory> */
     use HasFactory;
 
-    protected $fillable = ['customer_id', 'user_id', 'cash_session_id', 'reference', 'total_amount', 'payment_status'];
+    protected $fillable = ['customer_id', 'user_id', 'cash_session_id', 'reference', 'idempotency_key', 'total_amount', 'payment_status'];
 
     protected $casts = [
         'total_amount' => 'decimal:2',

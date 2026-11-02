@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -42,41 +43,174 @@ class SaleService
      */
     public function createSale(array $data, User $user): Sale
     {
-        return DB::transaction(function () use ($data, $user): Sale {
-            $cashSession = $this->openCashSessionFor($user);
+        $idempotencyKey = $this->idempotencyKey($data);
 
-            $lines = $this->prepareLines($data['items'] ?? []);
-            $total = round(array_sum(array_column($lines, 'subtotal')), 2);
+        if ($idempotencyKey !== null) {
+            $existing = $this->findByIdempotencyKey($user, $idempotencyKey);
 
-            $paid = round((float) ($data['payment']['amount'] ?? 0), 2);
+            if ($existing instanceof Sale) {
+                return $existing;
+            }
+        }
 
-            if ($paid > $total) {
+        try {
+            return DB::transaction(function () use ($data, $user, $idempotencyKey): Sale {
+                $cashSession = $this->openCashSessionFor($user);
+
+                $this->assertPriceOverridesAreAuthorized($data['items'] ?? [], $user);
+
+                $lines = $this->prepareLines($data['items'] ?? []);
+                $total = round(array_sum(array_column($lines, 'subtotal')), 2);
+
+                $paid = round((float) ($data['payment']['amount'] ?? 0), 2);
+
+                if ($paid > $total) {
+                    throw ValidationException::withMessages([
+                        'payment.amount' => 'Le montant payé ne peut pas dépasser le total de la vente.',
+                    ]);
+                }
+
+                $due = round($total - $paid, 2);
+
+                $customer = $this->resolveCustomer($data['customer_id'] ?? null, $due);
+
+                $this->assertCreditLimit($customer, $due);
+
+                $sale = $this->createSaleRecord($total, $paid, $due, $customer, $cashSession, $user, $idempotencyKey);
+
+                foreach ($lines as $line) {
+                    $this->recordLine($sale, $line, $user);
+                }
+
+                if ($paid > 0) {
+                    $this->recordPayment($sale, $paid, $data['payment'] ?? [], $user);
+                }
+
+                // Le reliquat de la vente est reporte sur la dette du client.
+                if ($due > 0 && $customer instanceof Customer) {
+                    $customer->outstanding_balance = round((float) $customer->outstanding_balance + $due, 2);
+                    $customer->save();
+                }
+
+                return $sale->load(['customer', 'user', 'items.product', 'payments']);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            // Deux requetes simultanees avec la meme cle : la contrainte
+            // unique departage, la seconde renvoie la vente deja creee.
+            if ($idempotencyKey !== null) {
+                $existing = $this->findByIdempotencyKey($user, $idempotencyKey);
+
+                if ($existing instanceof Sale) {
+                    return $existing;
+                }
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * Cle d'idempotence normalisee, ou null si elle est absente.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function idempotencyKey(array $data): ?string
+    {
+        $key = $data['idempotency_key'] ?? null;
+
+        if (! is_string($key) || trim($key) === '') {
+            return null;
+        }
+
+        return trim($key);
+    }
+
+    /**
+     * Vente deja enregistree pour cette cle et ce vendeur.
+     */
+    private function findByIdempotencyKey(User $user, string $idempotencyKey): ?Sale
+    {
+        return Sale::query()
+            ->where('user_id', $user->id)
+            ->where('idempotency_key', $idempotencyKey)
+            ->with(['customer', 'user', 'items.product', 'payments'])
+            ->first();
+    }
+
+    /**
+     * Enregistre un règlement ultérieur sur une vente à crédit.
+     *
+     * La vente est verrouillée pendant l'opération : deux encaissements
+     * concurrents ne peuvent pas dépasser ensemble le reste à payer. La dette
+     * du client est diminuée du montant encaissé et le statut de la vente est
+     * recalculé à partir des paiements réellement enregistrés.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     */
+    public function addPayment(Sale $sale, array $data, User $user): Sale
+    {
+        return DB::transaction(function () use ($sale, $data, $user): Sale {
+            $lockedSale = Sale::query()
+                ->lockForUpdate()
+                ->findOrFail($sale->id);
+
+            $paidBefore = $lockedSale->paidAmount();
+            $due = round((float) $lockedSale->total_amount - $paidBefore, 2);
+
+            if ($due <= 0) {
                 throw ValidationException::withMessages([
-                    'payment.amount' => 'Le montant payé ne peut pas dépasser le total de la vente.',
+                    'amount' => 'Cette vente est déjà entièrement réglée.',
                 ]);
             }
 
-            $due = round($total - $paid, 2);
+            $amount = round((float) $data['amount'], 2);
 
-            $customer = $this->resolveCustomer($data['customer_id'] ?? null, $due);
-
-            $sale = $this->createSaleRecord($total, $paid, $due, $customer, $cashSession, $user);
-
-            foreach ($lines as $line) {
-                $this->recordLine($sale, $line, $user);
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Le montant doit être supérieur à zéro.',
+                ]);
             }
 
-            if ($paid > 0) {
-                $this->recordPayment($sale, $paid, $data['payment'] ?? [], $user);
+            if ($amount > $due) {
+                throw ValidationException::withMessages([
+                    'amount' => sprintf(
+                        'Le montant dépasse le reste à payer (%s).',
+                        number_format($due, 2, '.', ''),
+                    ),
+                ]);
             }
 
-            // Le reliquat de la vente est reporte sur la dette du client.
-            if ($due > 0 && $customer instanceof Customer) {
-                $customer->outstanding_balance = round((float) $customer->outstanding_balance + $due, 2);
-                $customer->save();
+            Payment::create([
+                'sale_id' => $lockedSale->id,
+                'user_id' => $user->id,
+                'amount' => $amount,
+                'method' => $data['method'],
+                'reference' => $data['reference'] ?? null,
+            ]);
+
+            if ($lockedSale->customer_id !== null) {
+                $customer = Customer::query()
+                    ->lockForUpdate()
+                    ->find($lockedSale->customer_id);
+
+                if ($customer instanceof Customer) {
+                    $customer->outstanding_balance = max(
+                        0,
+                        round((float) $customer->outstanding_balance - $amount, 2),
+                    );
+                    $customer->save();
+                }
             }
 
-            return $sale->load(['customer', 'user', 'items.product', 'payments']);
+            $newPaid = round($paidBefore + $amount, 2);
+            $newDue = round((float) $lockedSale->total_amount - $newPaid, 2);
+
+            $lockedSale->payment_status = $newDue <= 0 ? 'paid' : 'partial';
+            $lockedSale->save();
+
+            return $lockedSale->load(['customer', 'user', 'items.product', 'payments']);
         });
     }
 
@@ -98,6 +232,33 @@ class SaleService
         }
 
         return $cashSession;
+    }
+
+    /**
+     * Verifie que le vendeur est autorise a appliquer un prix personnalise.
+     *
+     * Le prix du catalogue reste la reference pour une vente ordinaire. Seuls
+     * les responsables designes peuvent negocier un prix ou appliquer une
+     * remise, afin qu'un vendeur ne puisse pas fixer arbitrairement le montant
+     * encaisse.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     *
+     * @throws ValidationException
+     */
+    private function assertPriceOverridesAreAuthorized(array $items, User $user): void
+    {
+        if ($user->hasAnyRole(['Admin', 'Gérant'])) {
+            return;
+        }
+
+        foreach (array_values($items) as $index => $item) {
+            if (array_key_exists('unit_price', $item) && $item['unit_price'] !== null) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.unit_price" => 'Seuls un administrateur ou un gérant peuvent appliquer un prix personnalisé.',
+                ]);
+            }
+        }
     }
 
     /**
@@ -173,10 +334,16 @@ class SaleService
             $reserved[$productId] = $alreadyReserved + $quantity;
 
             // Le prix de vente du catalogue est utilise par defaut ; un prix
-            // different peut etre impose a la caisse (negociation, remise).
+            // different ne peut etre impose que par un role autorise.
             $unitPrice = isset($item['unit_price']) && $item['unit_price'] !== null
                 ? round((float) $item['unit_price'], 2)
                 : (float) $product->sale_price;
+
+            if ($unitPrice <= 0) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.unit_price" => 'Le prix unitaire doit être supérieur à zéro.',
+                ]);
+            }
 
             $lines[] = [
                 'product' => $product,
@@ -227,6 +394,43 @@ class SaleService
     }
 
     /**
+     * Verifie que la dette du client ne depasse pas son plafond de credit.
+     *
+     * Un plafond a zero est traite comme "non configure" : le client peut
+     * acheter a credit sans limite. Un plafond positif est un montant maximal
+     * de dette cumulee, reliquat de la vente en cours compris.
+     *
+     * @throws ValidationException
+     */
+    private function assertCreditLimit(?Customer $customer, float $due): void
+    {
+        if (! $customer instanceof Customer || $due <= 0) {
+            return;
+        }
+
+        $limit = (float) $customer->credit_limit;
+
+        if ($limit <= 0) {
+            return;
+        }
+
+        $balance = (float) $customer->outstanding_balance;
+        $projected = round($balance + $due, 2);
+
+        if ($projected > $limit) {
+            throw ValidationException::withMessages([
+                'customer_id' => sprintf(
+                    'Le plafond de crédit de « %s » est dépassé : %s en cours, %s demandé(s), plafond %s.',
+                    $customer->name,
+                    number_format($balance, 2, '.', ''),
+                    number_format($due, 2, '.', ''),
+                    number_format($limit, 2, '.', ''),
+                ),
+            ]);
+        }
+    }
+
+    /**
      * Enregistre la vente et sa reference.
      *
      * @param  float  $total  Montant total de la vente.
@@ -240,6 +444,7 @@ class SaleService
         ?Customer $customer,
         CashSession $cashSession,
         User $user,
+        ?string $idempotencyKey = null,
     ): Sale {
         $sale = new Sale([
             'customer_id' => $customer?->id,
@@ -248,6 +453,7 @@ class SaleService
             // Reference provisoire : la reference lisible est derivee de
             // l'identifiant, obtenu apres l'insertion.
             'reference' => 'TMP-'.Str::uuid()->toString(),
+            'idempotency_key' => $idempotencyKey,
             'total_amount' => $total,
             'payment_status' => $this->paymentStatus($paid, $due),
         ]);
@@ -300,9 +506,9 @@ class SaleService
             'product_id' => $product->id,
             'user_id' => $user->id,
             'type' => 'out',
-            // La quantite est toujours positive : le type porte le sens du
-            // mouvement (sortie de stock pour une vente).
-            'quantity' => $line['quantity'],
+            // Quantite signee : une sortie reduit le stock. Les entrees sont
+            // positives et les ajustements portent leur delta signe.
+            'quantity' => -$line['quantity'],
             'reference' => $sale->reference,
             'note' => sprintf('Vente %s', $sale->reference),
         ]);

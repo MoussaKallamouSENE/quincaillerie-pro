@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,10 +15,40 @@ class UpdateUserRequest extends FormRequest
      * Determine if the user is authorized to make this request.
      *
      * Seuls les comptes autorises a gerer les utilisateurs peuvent en modifier.
+     * Un compte non administrateur ne peut ni modifier un administrateur, ni
+     * attribuer le role Admin. Personne ne peut changer son propre role ni
+     * desactiver son propre compte par cet endpoint.
      */
     public function authorize(): bool
     {
-        return Gate::allows('gerer_utilisateurs');
+        $actor = $this->user();
+        $target = $this->route('user');
+
+        if (! Gate::allows('gerer_utilisateurs') || $actor === null || ! $target instanceof User) {
+            return false;
+        }
+
+        if ($target->hasRole('Admin') && ! $actor->hasRole('Admin')) {
+            return false;
+        }
+
+        if ($this->input('role') === 'Admin' && ! $actor->hasRole('Admin')) {
+            return false;
+        }
+
+        if ($target->is($actor)) {
+            $currentRole = $target->getRoleNames()->first();
+
+            if ($this->filled('role') && $this->input('role') !== $currentRole) {
+                return false;
+            }
+
+            if ($this->has('is_active') && ! $this->boolean('is_active') && $target->is_active) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

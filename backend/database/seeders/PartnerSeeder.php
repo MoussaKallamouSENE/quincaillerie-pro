@@ -22,6 +22,11 @@ class PartnerSeeder extends Seeder
      */
     public function run(): void
     {
+        // Les partenaires d'exemple ne doivent jamais être ajoutés à une base de production.
+        if (app()->isProduction()) {
+            return;
+        }
+
         $customers = $this->seedCustomers();
         $suppliers = $this->seedSuppliers();
 

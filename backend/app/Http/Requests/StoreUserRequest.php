@@ -14,10 +14,16 @@ class StoreUserRequest extends FormRequest
      * Determine if the user is authorized to make this request.
      *
      * Seuls les comptes autorises a gerer les utilisateurs peuvent en creer.
+     * La creation d'un compte administrateur est reservee aux administrateurs.
      */
     public function authorize(): bool
     {
-        return Gate::allows('gerer_utilisateurs');
+        if (! Gate::allows('gerer_utilisateurs')) {
+            return false;
+        }
+
+        return $this->input('role') !== 'Admin'
+            || (bool) $this->user()?->hasRole('Admin');
     }
 
     /**

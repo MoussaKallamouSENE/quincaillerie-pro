@@ -24,6 +24,12 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
+            'parent_id' => $this->parent_id,
+            'parent' => $this->whenLoaded('parent', fn () => $this->parent === null ? null : [
+                'id' => $this->parent->id,
+                'name' => $this->parent->name,
+            ]),
+            'products_count' => $this->whenCounted('products'),
             'is_active' => $this->is_active,
         ];
     }

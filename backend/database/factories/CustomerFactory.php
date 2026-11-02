@@ -22,7 +22,7 @@ class CustomerFactory extends Factory
             'phone' => fake()->numerify('+221 7# ## ## ##'),
             'email' => fake()->unique()->safeEmail(),
             'address' => fake()->address(),
-            'credit_limit' => fake()->randomFloat(2, 0, 500000),
+            'credit_limit' => 500000,
             'outstanding_balance' => 0,
             'is_active' => true,
         ];

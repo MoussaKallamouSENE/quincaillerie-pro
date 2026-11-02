@@ -33,7 +33,10 @@ class ProductResource extends JsonResource
                 'name' => $this->unit->name,
                 'symbol' => $this->unit->symbol,
             ]),
-            'purchase_price' => $this->purchase_price,
+            'purchase_price' => $this->when(
+                (bool) $request->user()?->hasAnyRole(['Admin', 'Gérant']),
+                fn () => $this->purchase_price,
+            ),
             'sale_price' => $this->sale_price,
             'stock_quantity' => $this->stock_quantity,
             'min_stock_alert' => $this->min_stock_alert,

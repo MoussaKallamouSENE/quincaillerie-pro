@@ -30,6 +30,11 @@ class ProductSeeder extends Seeder
      */
     public function run(): void
     {
+        // Les produits d'exemple ne doivent jamais être ajoutés à une base de production.
+        if (app()->isProduction()) {
+            return;
+        }
+
         $this->removeDemoCatalog();
 
         $units = $this->seedUnits();

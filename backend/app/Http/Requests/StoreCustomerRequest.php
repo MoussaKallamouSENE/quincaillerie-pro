@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreCustomerRequest extends FormRequest
 {
@@ -35,6 +36,40 @@ class StoreCustomerRequest extends FormRequest
             'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'credit_limit' => ['sometimes', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * Empeche un vendeur de fixer un plafond de credit.
+     *
+     * Un plafond a zero est la valeur par defaut de l'application : il reste
+     * accepte pour ne pas bloquer la creation normale d'un client a la caisse.
+     *
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($this->user()?->hasAnyRole(['Admin', 'Gérant'])) {
+                    return;
+                }
+
+                if (! $this->has('credit_limit')) {
+                    return;
+                }
+
+                $creditLimit = $this->input('credit_limit');
+
+                if (is_numeric($creditLimit) && (float) $creditLimit === 0.0) {
+                    return;
+                }
+
+                $validator->errors()->add(
+                    'credit_limit',
+                    'Seuls un administrateur ou un gérant peuvent définir un plafond de crédit.',
+                );
+            },
         ];
     }
 

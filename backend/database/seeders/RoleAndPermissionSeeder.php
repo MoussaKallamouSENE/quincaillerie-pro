@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -13,9 +12,8 @@ class RoleAndPermissionSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * Le seeder est idempotent : les roles, la permission et l'utilisateur de
-     * demonstration sont crees s'ils n'existent pas encore. Une seconde
-     * execution ne doit pas echouer sur un doublon.
+     * Le seeder configure uniquement les rôles et permissions. Aucun compte
+     * de démonstration ni mot de passe fixe n'est créé par défaut.
      */
     public function run(): void
     {
@@ -42,19 +40,6 @@ class RoleAndPermissionSeeder extends Seeder
 
         $admin->givePermissionTo($ajusterStock);
         $gerant->givePermissionTo($ajusterStock);
-        // Créer le SuperAdmin user
-        $superAdmin = User::firstOrCreate(
-            ['email' => 'superadmin@quincaillerie.com'],
-            [
-                'name' => 'SuperAdmin',
-                'password' => bcrypt('password'),
-                'is_active' => true,
-            ],
-        );
-
-        // Assigner le rôle Admin au SuperAdmin
-        $superAdmin->assignRole($admin);
-
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

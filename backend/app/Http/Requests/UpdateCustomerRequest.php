@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Customer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateCustomerRequest extends FormRequest
 {
@@ -36,6 +38,46 @@ class UpdateCustomerRequest extends FormRequest
             'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'credit_limit' => ['sometimes', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * Empeche un vendeur de modifier le plafond de credit.
+     *
+     * Le champ peut etre omis ou renvoye a l'identique lors d'une mise a jour
+     * d'un autre champ. Toute modification reelle reste reservee aux
+     * administrateurs et aux gerants.
+     *
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($this->user()?->hasAnyRole(['Admin', 'Gérant'])) {
+                    return;
+                }
+
+                if (! $this->has('credit_limit')) {
+                    return;
+                }
+
+                $customer = $this->route('customer');
+                $creditLimit = $this->input('credit_limit');
+
+                if (
+                    $customer instanceof Customer
+                    && is_numeric($creditLimit)
+                    && (float) $creditLimit === (float) $customer->credit_limit
+                ) {
+                    return;
+                }
+
+                $validator->errors()->add(
+                    'credit_limit',
+                    'Seuls un administrateur ou un gérant peuvent modifier le plafond de crédit.',
+                );
+            },
         ];
     }
 

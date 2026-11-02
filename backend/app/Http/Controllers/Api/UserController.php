@@ -135,6 +135,11 @@ class UserController extends Controller
 
             $user->save();
 
+            if (array_key_exists('is_active', $data) && ! $data['is_active']) {
+                // Un compte desactive ne doit plus pouvoir utiliser ses jetons existants.
+                $user->tokens()->delete();
+            }
+
             if (! empty($data['role'])) {
                 $user->syncRoles([$data['role']]);
             }
@@ -160,6 +165,10 @@ class UserController extends Controller
             return response()->json([
                 'message' => 'Vous ne pouvez pas supprimer votre propre compte.',
             ], Response::HTTP_CONFLICT);
+        }
+
+        if ($user->hasRole('Admin') && ! $request->user()->hasRole('Admin')) {
+            throw new AuthorizationException('Seul un administrateur peut supprimer un compte administrateur.');
         }
 
         foreach (self::ACTIVITY_RELATIONS as $relation) {

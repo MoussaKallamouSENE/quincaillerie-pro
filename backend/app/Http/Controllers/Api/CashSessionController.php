@@ -9,6 +9,7 @@ use App\Http\Requests\CloseCashSessionRequest;
 use App\Http\Requests\OpenCashSessionRequest;
 use App\Http\Resources\CashSessionResource;
 use App\Models\CashSession;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,10 +28,13 @@ class CashSessionController extends Controller
     public function open(OpenCashSessionRequest $request): JsonResponse
     {
         $cashSession = DB::transaction(function () use ($request): CashSession {
-            $user = $request->user();
+            // Lock the existing parent row so concurrent attempts for the same
+            // user are serialized even when no open session row exists yet.
+            $user = User::query()
+                ->whereKey($request->user()->getAuthIdentifier())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            // The row is locked so that two concurrent openings cannot both
-            // pass the check and leave the user with two open sessions.
             $existing = CashSession::query()
                 ->where('user_id', $user->id)
                 ->where('status', 'open')

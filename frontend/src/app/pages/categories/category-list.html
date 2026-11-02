@@ -1,0 +1,239 @@
+<div>
+  <!-- Titre + action -->
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Catégories</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        Organisez le catalogue par familles de produits
+      </p>
+    </div>
+
+    <button
+      type="button"
+      (click)="openCreate()"
+      class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+    >
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Nouvelle catégorie
+    </button>
+  </div>
+
+  <!-- Liste -->
+  <section class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30">
+    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4">
+      <div class="relative w-full max-w-sm">
+        <svg class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Rechercher une catégorie…"
+          aria-label="Rechercher une catégorie"
+          [value]="searchTerm()"
+          (input)="onSearch($event)"
+          class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-3 pl-10 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <p class="text-sm text-slate-400">
+        <span class="font-semibold text-slate-200">{{ resultCount() }}</span>
+        @if (resultCount() > 1) {
+          catégories
+        } @else {
+          catégorie
+        }
+      </p>
+    </header>
+
+    @if (loading()) {
+      <p class="sr-only" role="status">Chargement des catégories…</p>
+      <div class="overflow-x-auto" aria-hidden="true">
+        <table class="w-full min-w-[720px] text-left text-sm">
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (row of [1, 2, 3, 4, 5]; track row) {
+              <tr>
+                <td class="px-6 py-4"><div class="h-3.5 w-40 animate-pulse rounded bg-emerald-800/50"></div></td>
+                <td class="px-6 py-4"><div class="h-3.5 w-56 animate-pulse rounded bg-emerald-800/40"></div></td>
+                <td class="px-6 py-4"><div class="h-3.5 w-28 animate-pulse rounded bg-emerald-800/40"></div></td>
+                <td class="px-6 py-4"><div class="h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (error()) {
+      <div class="px-6 py-16 text-center">
+        <p class="text-sm text-red-300">{{ error() }}</p>
+        <button
+          type="button"
+          (click)="load()"
+          class="mt-4 rounded-lg border border-emerald-700/60 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-emerald-900/50"
+        >
+          Réessayer
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[720px] text-left text-sm">
+          <thead class="bg-emerald-950/40 text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th class="px-6 py-3 font-semibold">Nom</th>
+              <th class="px-6 py-3 font-semibold">Description</th>
+              <th class="px-6 py-3 font-semibold">Catégorie parente</th>
+              <th class="px-6 py-3 font-semibold">Produits</th>
+              <th class="px-6 py-3 font-semibold">Statut</th>
+              <th class="px-6 py-3 text-right font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (category of filteredCategories(); track category.id) {
+              <tr class="transition hover:bg-emerald-900/20">
+                <td class="px-6 py-4 font-medium text-slate-100">{{ category.name }}</td>
+                <td class="max-w-xs truncate px-6 py-4 text-slate-400">{{ category.description || '—' }}</td>
+                <td class="px-6 py-4 text-slate-300">{{ parentName(category) }}</td>
+                <td class="px-6 py-4 text-slate-300">{{ category.products_count ?? 0 }}</td>
+                <td class="px-6 py-4">
+                  @if (category.is_active) {
+                    <span class="inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/25">
+                      Active
+                    </span>
+                  } @else {
+                    <span class="inline-flex rounded-full bg-slate-500/15 px-2.5 py-1 text-xs font-semibold text-slate-300 ring-1 ring-slate-500/25">
+                      Inactive
+                    </span>
+                  }
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      (click)="openEdit(category)"
+                      class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      (click)="remove(category)"
+                      class="rounded-lg border border-red-800/50 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="px-6 py-16 text-center text-sm text-slate-400">
+                  Aucune catégorie ne correspond à votre recherche.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- Modale -->
+  @if (showModal()) {
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      (click)="closeModal()"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-emerald-700 bg-[#153322] p-6 shadow-2xl"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 class="text-xl font-bold text-white">
+          {{ isEditing() ? 'Modifier la catégorie' : 'Nouvelle catégorie' }}
+        </h2>
+
+        <form class="mt-5 space-y-4" (ngSubmit)="save()">
+          <div>
+            <label for="category-name" class="mb-1.5 block text-sm font-medium text-slate-300">
+              Nom <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="category-name"
+              name="name"
+              type="text"
+              maxlength="255"
+              [(ngModel)]="form.name"
+              placeholder="Ex: Outillage"
+              class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label for="category-description" class="mb-1.5 block text-sm font-medium text-slate-300">
+              Description
+            </label>
+            <textarea
+              id="category-description"
+              name="description"
+              rows="3"
+              maxlength="1000"
+              [(ngModel)]="form.description"
+              placeholder="Description facultative…"
+              class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            ></textarea>
+          </div>
+
+          <div>
+            <label for="category-parent" class="mb-1.5 block text-sm font-medium text-slate-300">
+              Catégorie parente
+            </label>
+            <select
+              id="category-parent"
+              name="parent_id"
+              [(ngModel)]="form.parent_id"
+              class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option [ngValue]="null">Aucune (catégorie racine)</option>
+              @for (parent of parentOptions(); track parent.id) {
+                <option [ngValue]="parent.id">{{ parent.name }}</option>
+              }
+            </select>
+          </div>
+
+          <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              name="is_active"
+              [(ngModel)]="form.is_active"
+              class="h-4 w-4 rounded border-emerald-700 bg-[#0a1912] text-emerald-500 focus:ring-emerald-500"
+            />
+            Catégorie active
+          </label>
+
+          @if (formError()) {
+            <p class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">
+              {{ formError() }}
+            </p>
+          }
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              (click)="closeModal()"
+              [disabled]="submitting()"
+              class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/50 disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ submitting() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

@@ -103,6 +103,7 @@ export interface SaleItemPayload {
 export interface SalePaymentPayload {
   method: PaymentMethod;
   amount: number;
+  reference?: string;
 }
 
 /**
@@ -115,4 +116,9 @@ export interface SalePayload {
   customer_id: number | null;
   items: SaleItemPayload[];
   payment?: SalePaymentPayload;
+  /**
+   * Cle generee par la caisse pour rendre la soumission idempotente : une
+   * seconde requete avec la meme cle renvoie la vente deja enregistree.
+   */
+  idempotency_key?: string;
 }

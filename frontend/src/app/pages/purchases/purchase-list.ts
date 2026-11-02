@@ -1,7 +1,8 @@
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/auth/auth-service';
+import { extractErrorMessage } from '../../core/http/api-error';
 import { ToastService } from '../../core/toast/toast-service';
 import { ProductService } from '../../services/product-service';
 import { Purchase, PurchaseService } from '../../services/purchase-service';
@@ -16,7 +17,7 @@ interface PurchaseLine {
 @Component({
   selector: 'app-purchase-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe],
+  imports: [CommonModule, FormsModule],
   templateUrl: './purchase-list.html',
   styleUrl: './purchase-list.css',
 })
@@ -33,6 +34,9 @@ export class PurchaseListComponent implements OnInit {
   readonly loading = signal(false);
   readonly showModal = signal(false);
   readonly submitting = signal(false);
+  readonly selectedPurchase = signal<Purchase | null>(null);
+  readonly loadingDetail = signal(false);
+  readonly cancelling = signal(false);
 
   supplierId: number | null = null;
   lines: PurchaseLine[] = [{ product_id: null, quantity: 1, unit_price: 0 }];
@@ -140,7 +144,7 @@ export class PurchaseListComponent implements OnInit {
       return;
     }
     if (!this.supplierId) {
-      alert('Veuillez sélectionner un fournisseur');
+      this.toastService.error('Veuillez sélectionner un fournisseur.');
       return;
     }
     const items = this.lines
@@ -152,7 +156,7 @@ export class PurchaseListComponent implements OnInit {
       }));
 
     if (items.length === 0) {
-      alert('Veuillez ajouter au moins un produit');
+      this.toastService.error('Veuillez ajouter au moins un produit.');
       return;
     }
 
@@ -166,7 +170,67 @@ export class PurchaseListComponent implements OnInit {
       },
       error: (err) => {
         this.submitting.set(false);
-        alert(err.error?.message || "Erreur lors de la création de l'achat");
+        this.toastService.error(
+          extractErrorMessage(err, "Erreur lors de la création de l'achat"),
+        );
+      },
+    });
+  }
+
+  openDetails(purchase: Purchase): void {
+    this.selectedPurchase.set(purchase);
+    this.loadingDetail.set(true);
+
+    this.purchaseService.getPurchase(purchase.id).subscribe({
+      next: (detail) => {
+        this.loadingDetail.set(false);
+        this.selectedPurchase.set(detail);
+      },
+      error: (err) => {
+        this.loadingDetail.set(false);
+        this.selectedPurchase.set(null);
+        this.toastService.error(
+          extractErrorMessage(err, "Impossible de charger le détail de l'achat."),
+        );
+      },
+    });
+  }
+
+  closeDetails(): void {
+    if (this.cancelling()) {
+      return;
+    }
+
+    this.selectedPurchase.set(null);
+  }
+
+  cancelPurchase(purchase: Purchase): void {
+    if (purchase.status === 'cancelled' || this.cancelling()) {
+      return;
+    }
+
+    const message =
+      purchase.status === 'received'
+        ? 'Annuler cette commande déjà réceptionnée ? Le stock reçu sera retiré. Cette opération est refusée si le stock est insuffisant.'
+        : 'Confirmer l’annulation de cette commande d’achat ?';
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    this.cancelling.set(true);
+    this.purchaseService.cancelPurchase(purchase.id).subscribe({
+      next: () => {
+        this.cancelling.set(false);
+        this.selectedPurchase.set(null);
+        this.toastService.success('Commande annulée avec succès.');
+        this.loadPurchases();
+      },
+      error: (err) => {
+        this.cancelling.set(false);
+        this.toastService.error(
+          extractErrorMessage(err, "Impossible d'annuler cette commande."),
+        );
       },
     });
   }
@@ -184,7 +248,9 @@ export class PurchaseListComponent implements OnInit {
         this.loadPurchases();
       },
       error: (err) => {
-        alert(err.error?.message || 'Erreur lors de la réception');
+        this.toastService.error(
+          extractErrorMessage(err, 'Erreur lors de la réception.'),
+        );
       },
     });
   }
@@ -196,12 +262,18 @@ export class PurchaseListComponent implements OnInit {
     if (status === 'pending') {
       return 'En attente';
     }
+    if (status === 'cancelled') {
+      return 'Annulé';
+    }
     return status;
   }
 
   getStatusClass(status: string): string {
     if (status === 'received') {
       return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25';
+    }
+    if (status === 'cancelled') {
+      return 'bg-slate-500/15 text-slate-300 ring-1 ring-slate-500/25';
     }
     return 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/25';
   }

@@ -2,7 +2,12 @@ import { HttpClient, HttpResourceRequest } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CategoryList, UnitList } from './reference.model';
+import {
+  CategoryDraft,
+  CategoryList,
+  CategoryResponse,
+  UnitList,
+} from './reference.model';
 
 /**
  * Client HTTP des listes de reference du catalogue.
@@ -27,6 +32,26 @@ export class ReferenceService {
   /** Liste des categories du catalogue. */
   getCategories(): Observable<CategoryList> {
     return this.http.get<CategoryList>(this.categoriesUrl);
+  }
+
+  /** Detail d'une categorie. */
+  getCategory(id: number): Observable<CategoryResponse> {
+    return this.http.get<CategoryResponse>(`${this.categoriesUrl}/${id}`);
+  }
+
+  /** Cree une categorie. */
+  createCategory(draft: CategoryDraft): Observable<CategoryResponse> {
+    return this.http.post<CategoryResponse>(this.categoriesUrl, draft);
+  }
+
+  /** Modifie une categorie existante. */
+  updateCategory(id: number, draft: CategoryDraft): Observable<CategoryResponse> {
+    return this.http.put<CategoryResponse>(`${this.categoriesUrl}/${id}`, draft);
+  }
+
+  /** Supprime une categorie vide. */
+  deleteCategory(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.categoriesUrl}/${id}`);
   }
 
   /** Liste des unites de mesure du catalogue. */

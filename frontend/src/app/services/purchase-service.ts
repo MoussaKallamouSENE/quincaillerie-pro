@@ -51,11 +51,22 @@ export class PurchaseService {
     });
   }
 
+  getPurchase(id: number): Observable<Purchase> {
+    return this.http.get<Purchase>(`${this.baseUrl}/purchases/${id}`);
+  }
+
   createPurchase(draft: PurchaseDraft): Observable<Purchase> {
     return this.http.post<Purchase>(`${this.baseUrl}/purchases`, draft);
   }
 
   receivePurchase(id: number): Observable<any> {
     return this.http.post(`${this.baseUrl}/purchases/${id}/receive`, {});
+  }
+
+  cancelPurchase(id: number): Observable<{ message: string; purchase: Purchase }> {
+    return this.http.post<{ message: string; purchase: Purchase }>(
+      `${this.baseUrl}/purchases/${id}/cancel`,
+      {},
+    );
   }
 }

@@ -29,7 +29,7 @@ export interface Product {
   name: string;
   category: ProductCategory;
   unit: ProductUnit;
-  purchase_price: string;
+  purchase_price?: string;
   sale_price: string;
   stock_quantity: number;
   min_stock_alert: number;

@@ -9,6 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { downloadBlob } from '../../core/http/download-file';
@@ -65,7 +66,7 @@ const STATUS_CLASSES: Record<PaymentStatus, string> = {
  */
 @Component({
   selector: 'app-sale-list',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, FormsModule],
   templateUrl: './sale-list.component.html',
   styleUrl: './sale-list.component.css',
 })
@@ -91,6 +92,26 @@ export class SaleListComponent {
 
   /** Vente dont la facture est en cours de generation. */
   protected readonly downloadingInvoiceId = signal<number | null>(null);
+
+  /** Vente dont un reglement est en cours de saisie. */
+  protected readonly paymentSale = signal<Sale | null>(null);
+
+  /** Vrai pendant l'enregistrement d'un reglement. */
+  protected readonly submittingPayment = signal(false);
+
+  /** Message d'erreur du formulaire de reglement. */
+  protected readonly paymentError = signal<string | null>(null);
+
+  /** Champs du formulaire de reglement. */
+  protected paymentForm: {
+    amount: number;
+    method: PaymentMethod;
+    reference: string;
+  } = {
+    amount: 0,
+    method: 'cash',
+    reference: '',
+  };
 
   /** Historique des ventes, filtre et pagine par le backend. */
   protected readonly sales = httpResource<SalesPage>(() =>
@@ -244,9 +265,92 @@ export class SaleListComponent {
       });
   }
 
+  /** Ouvre la modale de reglement d'une vente a credit. */
+  protected openPayment(sale: Sale): void {
+    this.paymentForm = {
+      amount: Number(sale.balance_due),
+      method: 'cash',
+      reference: '',
+    };
+    this.paymentError.set(null);
+    this.paymentSale.set(sale);
+  }
+
+  /** Ferme la modale de reglement. */
+  protected closePayment(): void {
+    if (this.submittingPayment()) {
+      return;
+    }
+
+    this.paymentSale.set(null);
+    this.paymentError.set(null);
+  }
+
+  /** Enregistre le reglement saisi sur la vente selectionnee. */
+  protected submitPayment(): void {
+    const sale = this.paymentSale();
+
+    if (sale === null || this.submittingPayment()) {
+      return;
+    }
+
+    const amount = Number(this.paymentForm.amount);
+    const due = Number(sale.balance_due);
+
+    if (! Number.isFinite(amount) || amount <= 0) {
+      this.paymentError.set('Le montant doit être supérieur à zéro.');
+
+      return;
+    }
+
+    if (amount > due) {
+      this.paymentError.set('Le montant dépasse le reste à payer.');
+
+      return;
+    }
+
+    this.submittingPayment.set(true);
+    this.paymentError.set(null);
+
+    this.saleService
+      .addPayment(sale.id, {
+        amount,
+        method: this.paymentForm.method,
+        reference: this.paymentForm.reference.trim() || undefined,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.submittingPayment.set(false);
+          this.paymentSale.set(null);
+
+          if (this.selectedSale()?.id === updated.id) {
+            this.selectedSale.set(updated);
+          }
+
+          this.toastService.success(
+            `Règlement de ${amount.toLocaleString('fr-FR')} FCFA enregistré.`,
+          );
+          this.reload();
+        },
+        error: (error: unknown) => {
+          this.submittingPayment.set(false);
+          this.paymentError.set(
+            extractErrorMessage(error, 'Impossible d’enregistrer le règlement.'),
+          );
+        },
+      });
+  }
+
   /** Ferme la modale quand la touche Echap est pressee. */
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
+    if (this.paymentSale()) {
+      this.closePayment();
+
+      return;
+    }
+
     if (this.selectedSale()) {
       this.closeDetails();
     }

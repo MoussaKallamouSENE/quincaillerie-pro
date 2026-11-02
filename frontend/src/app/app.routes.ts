@@ -33,6 +33,7 @@ export const routes: Routes = [
       },
       {
         path: 'sales',
+        canActivate: [roleGuard('Admin', 'Gérant')],
         loadComponent: () =>
           import('./pages/sales/sale-list.component').then((m) => m.SaleListComponent),
         title: 'Historique des ventes - Quincaillerie Pro',
@@ -41,6 +42,14 @@ export const routes: Routes = [
         path: 'products',
         loadComponent: () => import('./pages/products/product-list').then((m) => m.ProductList),
         title: 'Produits - Quincaillerie Pro',
+      },
+      {
+        // Reserve aux administrateurs et aux gerants.
+        path: 'categories',
+        canActivate: [roleGuard('Admin', 'Gérant')],
+        loadComponent: () =>
+          import('./pages/categories/category-list').then((m) => m.CategoryListComponent),
+        title: 'Catégories - Quincaillerie Pro',
       },
       {
         path: 'customers',
@@ -60,6 +69,7 @@ export const routes: Routes = [
       },
       {
         path: 'purchases',
+        canActivate: [roleGuard('Admin', 'Gérant')],
         loadComponent: () => import('./pages/purchases/purchase-list').then((m) => m.PurchaseListComponent),
         title: 'Achats - Quincaillerie Pro',
       },

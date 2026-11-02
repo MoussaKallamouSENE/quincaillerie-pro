@@ -204,6 +204,14 @@ export class Pos {
   /** Lignes du panier. */
   protected readonly cart = signal<CartLine[]>([]);
 
+  /**
+   * Cle d'idempotence de la tentative de vente en cours.
+   *
+   * Elle est conservee si la requete echoue (nouvel essai sans risque de
+   * double vente) et effacee des que le panier ou le paiement change.
+   */
+  private readonly saleIdempotencyKey = signal<string | null>(null);
+
   /** Total du panier, en FCFA. */
   protected readonly cartTotal = computed(() =>
     this.cart().reduce((total, line) => total + line.unitPrice * line.quantity, 0),
@@ -399,6 +407,7 @@ export class Pos {
       ...lines,
       { product, quantity: 1, unitPrice: Number(product.sale_price) },
     ]);
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Augmente la quantite d'une ligne du panier. */
@@ -416,6 +425,7 @@ export class Pos {
         item.product.id === line.product.id ? { ...item, quantity: item.quantity + 1 } : item,
       ),
     );
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Diminue la quantite d'une ligne du panier. */
@@ -429,23 +439,27 @@ export class Pos {
         return item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : [];
       }),
     );
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Retire une ligne du panier. */
   protected removeFromCart(line: CartLine): void {
     this.cart.update((lines) => lines.filter((item) => item.product.id !== line.product.id));
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Vide le panier. */
   protected clearCart(): void {
     this.cart.set([]);
     this.saleError.set(null);
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Selectionne le mode de paiement. */
   protected onSelectPaymentMethod(method: PaymentMethod): void {
     this.paymentMethod.set(method);
     this.receivedAmount.set(method === 'credit' ? 0 : this.cartTotal());
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Selectionne le client de la vente. */
@@ -453,6 +467,7 @@ export class Pos {
     const value = (event.target as HTMLSelectElement).value;
 
     this.selectedCustomerId.set(value ? Number(value) : null);
+    this.saleIdempotencyKey.set(null);
   }
 
   /** Met a jour le montant recu. */
@@ -460,6 +475,7 @@ export class Pos {
     const value = Number((event.target as HTMLInputElement).value);
 
     this.receivedAmount.set(Number.isFinite(value) ? value : 0);
+    this.saleIdempotencyKey.set(null);
   }
 
   /**
@@ -470,6 +486,10 @@ export class Pos {
    * total.
    */
   protected onValidateSale(): void {
+    if (this.submitting()) {
+      return;
+    }
+
     const lines = this.cart();
 
     if (lines.length === 0) {
@@ -489,6 +509,7 @@ export class Pos {
     const payload: SalePayload = {
       customer_id: customerId,
       items: lines.map((line) => ({ product_id: line.product.id, quantity: line.quantity })),
+      idempotency_key: this.idempotencyKeyForAttempt(),
     };
 
     const paid = this.paidAmount();
@@ -514,6 +535,7 @@ export class Pos {
           this.selectedCustomerId.set(null);
           this.onSelectPaymentMethod('cash');
           this.saleError.set(null);
+          this.saleIdempotencyKey.set(null);
 
           this.toastService.success(
             change > 0
@@ -533,6 +555,27 @@ export class Pos {
           this.saleError.set(extractErrorMessage(error, 'Impossible d’enregistrer la vente.'));
         },
       });
+  }
+
+  /**
+   * Cle de la tentative courante, creee au premier envoi et conservee en cas
+   * d'echec pour qu'un nouvel essai ne cree pas une seconde vente.
+   */
+  private idempotencyKeyForAttempt(): string {
+    const existing = this.saleIdempotencyKey();
+
+    if (existing !== null) {
+      return existing;
+    }
+
+    const key =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    this.saleIdempotencyKey.set(key);
+
+    return key;
   }
 
   /**

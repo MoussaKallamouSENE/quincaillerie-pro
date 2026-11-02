@@ -410,6 +410,7 @@ describe('Pos', () => {
       customer_id: null,
       items: [{ product_id: 1, quantity: 1 }],
       payment: { method: 'cash', amount: 250 },
+      idempotency_key: expect.any(String),
     });
 
     request.flush({ data: buildSale() });
@@ -418,6 +419,53 @@ describe('Pos', () => {
     const total = element.querySelector('[aria-live="polite"]')?.textContent ?? '';
     expect(normalizeSpaces(total)).toContain('0,00');
     expect(toastService.toasts()[0]?.message).toContain('VTE-000012');
+  });
+
+  it('should reuse the same idempotency key when a failed sale is retried', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    const firstRequest = httpMock.expectOne(isSalesRequest);
+    const firstKey = firstRequest.request.body.idempotency_key;
+    firstRequest.flush(
+      { message: 'Erreur temporaire.' },
+      { status: 500, statusText: 'Server Error' },
+    );
+    await settle();
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    const secondRequest = httpMock.expectOne(isSalesRequest);
+
+    expect(secondRequest.request.body.idempotency_key).toBe(firstKey);
+    secondRequest.flush({ data: buildSale() });
+    await settle();
+  });
+
+  it('should not send a second sale while the first one is in flight', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Valider la vente')?.click();
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    const requests = httpMock.match(isSalesRequest);
+
+    expect(requests.length).toBe(1);
+
+    requests[0].flush({ data: buildSale() });
+    await settle();
   });
 
   it('should show the sale success modal with the invoice button', async () => {
@@ -539,6 +587,7 @@ describe('Pos', () => {
     expect(request.request.body).toEqual({
       customer_id: 3,
       items: [{ product_id: 1, quantity: 1 }],
+      idempotency_key: expect.any(String),
     });
   });
 

@@ -2,7 +2,7 @@ import { HttpClient, HttpResourceRequest } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Sale, SalePayload, SaleQuery, SaleResponse, SalesPage } from './sale.model';
+import { Sale, SalePayload, SalePaymentPayload, SaleQuery, SaleResponse, SalesPage } from './sale.model';
 
 /**
  * Client HTTP des ventes.
@@ -58,6 +58,18 @@ export class SaleService {
   createSale(payload: SalePayload): Observable<Sale> {
     return this.http
       .post<SaleResponse>(this.salesUrl, payload)
+      .pipe(map((response) => response.data));
+  }
+
+  /**
+   * Enregistre un règlement ultérieur sur une vente à crédit.
+   *
+   * @param saleId Identifiant de la vente.
+   * @param payload Montant, mode de paiement et référence éventuelle.
+   */
+  addPayment(saleId: number, payload: SalePaymentPayload): Observable<Sale> {
+    return this.http
+      .post<SaleResponse>(`${this.salesUrl}/${saleId}/payments`, payload)
       .pipe(map((response) => response.data));
   }
 

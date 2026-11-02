@@ -13,7 +13,7 @@
             <th class="p-3">Produit</th>
             <th class="p-3">SKU</th>
             <th class="p-3">Stock Actuel</th>
-            <th class="p-3 text-right">Action</th>
+            <th *ngIf="canAdjust()" class="p-3 text-right">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -23,14 +23,14 @@
             <td class="p-3 font-bold" [class.text-red-400]="p.stock_quantity <= p.min_stock_alert" [class.text-emerald-400]="p.stock_quantity > p.min_stock_alert">
               {{ p.stock_quantity }}
             </td>
-            <td class="p-3 text-right">
+            <td *ngIf="canAdjust()" class="p-3 text-right">
               <button (click)="openModal(p)" class="bg-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium text-white hover:bg-emerald-500 transition shadow-md">
                 Ajuster
               </button>
             </td>
           </tr>
           <tr *ngIf="products().length === 0">
-            <td colspan="4" class="p-4 text-center text-slate-400">Aucun produit trouvé.</td>
+            <td [attr.colspan]="canAdjust() ? 4 : 3" class="p-4 text-center text-slate-400">Aucun produit trouvé.</td>
           </tr>
         </tbody>
       </table>
@@ -63,7 +63,7 @@
                 {{ m.type === 'in' ? 'Entrée' : m.type === 'out' ? 'Sortie' : 'Ajust.' }}
               </span>
             </td>
-            <td class="p-3 font-bold">{{ m.quantity }}</td>
+            <td class="p-3 font-bold">{{ movementQuantity(m) }}</td>
             <td class="p-3 text-slate-400 text-sm">{{ m.note }}</td>
           </tr>
           <tr *ngIf="movements().length === 0">
@@ -75,7 +75,7 @@
   </div>
 
   <!-- Modale d'ajustement -->
-  <div *ngIf="showModal()" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div *ngIf="showModal() && canAdjust()" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
     <div class="bg-[#153322] p-6 rounded-2xl w-full max-w-md border border-emerald-700 shadow-2xl">
       <h3 class="text-xl font-bold mb-4 text-white">Ajuster le stock</h3>
 
@@ -90,7 +90,7 @@
 
       <div class="mb-4">
         <label class="block mb-2 text-sm text-slate-300">Quantité</label>
-        <input type="number" [(ngModel)]="adjustment.quantity" min="1" class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        <input type="number" [(ngModel)]="adjustment.quantity" [min]="adjustment.type === 'adjustment' ? 0 : 1" class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
       </div>
 
       <div class="mb-6">
@@ -100,7 +100,7 @@
 
       <div class="flex justify-end gap-3">
         <button (click)="showModal.set(false)" class="px-5 py-2 rounded-lg text-slate-300 hover:bg-emerald-900/50 transition">Annuler</button>
-        <button (click)="onSubmit()" [disabled]="!adjustment.reason || adjustment.quantity < 1" class="px-5 py-2 bg-emerald-600 rounded-lg text-white font-medium hover:bg-emerald-500 transition disabled:opacity-50">Valider</button>
+        <button (click)="onSubmit()" [disabled]="!adjustment.reason || adjustment.quantity < 0 || (adjustment.type !== 'adjustment' && adjustment.quantity < 1)" class="px-5 py-2 bg-emerald-600 rounded-lg text-white font-medium hover:bg-emerald-500 transition disabled:opacity-50">Valider</button>
       </div>
     </div>
   </div>

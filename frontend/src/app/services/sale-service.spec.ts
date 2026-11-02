@@ -152,4 +152,28 @@ describe('SaleService', () => {
 
     request.flush({ data: SALE });
   });
+
+  it('should POST a later payment on a credit sale', () => {
+    let updated: Sale | undefined;
+
+    service
+      .addPayment(12, { method: 'wave', amount: 200, reference: 'WAVE-42' })
+      .subscribe((sale) => {
+        updated = sale;
+      });
+
+    const request = httpMock.expectOne(`${environment.apiUrl}/sales/12/payments`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      method: 'wave',
+      amount: 200,
+      reference: 'WAVE-42',
+    });
+
+    request.flush({ data: { ...SALE, payment_status: 'partial', balance_due: '300.00' } });
+
+    expect(updated?.payment_status).toBe('partial');
+    expect(updated?.balance_due).toBe('300.00');
+  });
 });

@@ -15,7 +15,23 @@ export interface CatalogCategory {
   id: number;
   name: string;
   description: string | null;
+  parent_id: number | null;
+  parent: { id: number; name: string } | null;
+  products_count?: number;
   is_active: boolean;
+}
+
+/** Donnees envoyees a l'API pour creer ou modifier une categorie. */
+export interface CategoryDraft {
+  name: string;
+  description: string | null;
+  parent_id: number | null;
+  is_active: boolean;
+}
+
+/** Reponse unitaire de l'API categories. */
+export interface CategoryResponse {
+  data: CatalogCategory;
 }
 
 /** Unite de mesure du catalogue, liste de reference. */

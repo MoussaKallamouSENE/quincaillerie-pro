@@ -1,8 +1,11 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../services/stock';
 import { ProductService } from '../../../services/product-service';
+import { AuthService } from '../../../core/auth/auth-service';
+import { ToastService } from '../../../core/toast/toast-service';
+import { extractErrorMessage } from '../../../core/http/api-error';
 
 @Component({
   selector: 'app-stock-list',
@@ -11,6 +14,11 @@ import { ProductService } from '../../../services/product-service';
   templateUrl: './stock-list.html'
 })
 export class StockListComponent implements OnInit {
+  private readonly stockService = inject(StockService);
+  private readonly productService = inject(ProductService);
+  private readonly auth = inject(AuthService);
+  private readonly toastService = inject(ToastService);
+
   // L'application est zoneless : l'etat affiche doit etre porte par des
   // signals pour que les reponses HTTP declenchent un nouveau rendu.
   readonly products = signal<any[]>([]);
@@ -18,10 +26,8 @@ export class StockListComponent implements OnInit {
   readonly showModal = signal(false);
   adjustment: any = { product_id: null, type: 'in', quantity: 1, reason: '' };
 
-  constructor(
-    private stockService: StockService,
-    private productService: ProductService
-  ) {}
+  /** Seuls les responsables peuvent ajuster le stock. */
+  readonly canAdjust = computed(() => this.auth.hasRole('Admin', 'Gérant'));
 
   ngOnInit() {
     this.loadData();
@@ -66,19 +72,42 @@ export class StockListComponent implements OnInit {
     });
   }
 
+  /** Quantite signee affichee dans l'historique. */
+  movementQuantity(movement: { type: string; quantity: number | string }): number {
+    const quantity = Number(movement.quantity);
+
+    if (! Number.isFinite(quantity)) {
+      return 0;
+    }
+
+    return movement.type === 'out' ? -Math.abs(quantity) : quantity;
+  }
+
   openModal(product: any) {
+    if (!this.canAdjust()) {
+      return;
+    }
+
     this.adjustment = { product_id: product.id, type: 'in', quantity: 1, reason: '' };
     this.showModal.set(true);
   }
 
   onSubmit() {
+    if (!this.canAdjust()) {
+      return;
+    }
+
     this.stockService.createMovement(this.adjustment).subscribe({
       next: () => {
         this.showModal.set(false);
         this.loadData();
-        alert('Stock mis à jour avec succès !');
+        this.toastService.success('Stock mis à jour avec succès.');
       },
-      error: (err) => alert('Erreur: ' + (err.error.message || 'Erreur inconnue'))
+      error: (err) => {
+        this.toastService.error(
+          extractErrorMessage(err, 'Impossible de mettre à jour le stock.'),
+        );
+      }
     });
   }
 }

@@ -68,6 +68,14 @@ export class ProductList {
    */
   protected readonly canSeePurchasePrice = computed(() => this.auth.hasRole('Admin', 'Gérant'));
 
+  /**
+   * Vrai si l'utilisateur peut gerer le catalogue.
+   *
+   * La creation et la modification des produits sont reservees aux
+   * responsables, car le formulaire contient le prix d'achat.
+   */
+  protected readonly canManage = computed(() => this.auth.hasRole('Admin', 'Gérant'));
+
   /** Catalogue complet des produits. */
   protected readonly products = httpResource<ProductsPage>(() =>
     this.productService.listRequest({ per_page: MAX_PER_PAGE }),
@@ -198,6 +206,10 @@ export class ProductList {
 
   /** Ouvre la modale de creation et reinitialise le formulaire. */
   protected onCreateProduct(): void {
+    if (!this.canManage()) {
+      return;
+    }
+
     this.form.reset({
       name: '',
       sku: '',

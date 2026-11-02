@@ -90,8 +90,9 @@ class SaleInvoiceTest extends TestCase
 
     public function test_a_sale_invoice_can_be_downloaded_as_a_pdf(): void
     {
-        $this->authenticate();
         $sale = $this->createSale();
+
+        Sanctum::actingAs($sale->user);
 
         $response = $this->get("/api/sales/{$sale->id}/invoice");
 

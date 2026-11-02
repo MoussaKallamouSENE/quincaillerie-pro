@@ -4,10 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
+use App\Models\Sale;
+use App\Models\SaleItem;
+use App\Models\StockMovement;
+use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ProductApiTest extends TestCase
@@ -37,9 +44,27 @@ class ProductApiTest extends TestCase
     /**
      * Authentifie l'utilisateur de la session.
      */
-    private function authenticate(): void
+    private function authenticate(): User
     {
-        Sanctum::actingAs(User::factory()->create());
+        return $this->authenticateAs('Admin');
+    }
+
+    /**
+     * Authentifie un utilisateur avec le role demande.
+     */
+    private function authenticateAs(string $roleName): User
+    {
+        $role = Role::firstOrCreate([
+            'name' => $roleName,
+            'guard_name' => 'web',
+        ]);
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        Sanctum::actingAs($user);
+
+        return $user;
     }
 
     public function test_products_are_listed_with_their_relations(): void
@@ -286,5 +311,217 @@ class ProductApiTest extends TestCase
             ->assertJsonPath('message', 'Produit supprimé.');
 
         $this->assertDatabaseMissing('products', ['id' => $product->id]);
+    }
+
+    public function test_a_product_with_sale_history_cannot_be_deleted(): void
+    {
+        $this->authenticate();
+
+        $product = Product::factory()->create();
+        $sale = Sale::factory()->create();
+
+        SaleItem::create([
+            'sale_id' => $sale->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 1000,
+            'subtotal' => 1000,
+        ]);
+
+        $this->deleteJson("/api/products/{$product->id}")
+            ->assertConflict();
+
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
+    }
+
+    public function test_a_product_with_purchase_history_cannot_be_deleted(): void
+    {
+        $this->authenticate();
+
+        $product = Product::factory()->create();
+
+        $purchase = Purchase::create([
+            'supplier_id' => Supplier::factory()->create()->id,
+            'user_id' => User::factory()->create()->id,
+            'reference' => 'ACH-TEST-0001',
+            'total_amount' => 1000,
+            'status' => 'pending',
+        ]);
+
+        PurchaseItem::create([
+            'purchase_id' => $purchase->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 1000,
+            'subtotal' => 1000,
+        ]);
+
+        $this->deleteJson("/api/products/{$product->id}")
+            ->assertConflict();
+
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
+    }
+
+    public function test_a_product_with_stock_history_cannot_be_deleted(): void
+    {
+        $this->authenticate();
+
+        $product = Product::factory()->create();
+
+        StockMovement::create([
+            'product_id' => $product->id,
+            'user_id' => User::factory()->create()->id,
+            'type' => 'in',
+            'quantity' => 1,
+            'reference' => 'MVT-TEST-0001',
+            'note' => 'Stock initial de test',
+        ]);
+
+        $this->deleteJson("/api/products/{$product->id}")
+            ->assertConflict();
+
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
+    }
+
+    public function test_creating_a_product_records_its_initial_stock(): void
+    {
+        $user = $this->authenticate();
+
+        $response = $this->postJson('/api/products', $this->productPayload([
+            'sku' => 'PRD-STOCK-001',
+            'stock_quantity' => 12,
+        ]));
+
+        $response->assertCreated();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $response->json('data.id'),
+            'user_id' => $user->id,
+            'type' => 'in',
+            'quantity' => 12,
+            'reference' => 'INIT-PRD-STOCK-001',
+            'note' => 'Stock initial à la création du produit',
+        ]);
+    }
+
+    public function test_creating_a_product_without_stock_records_no_movement(): void
+    {
+        $this->authenticate();
+
+        $this->postJson('/api/products', $this->productPayload([
+            'sku' => 'PRD-STOCK-002',
+            'stock_quantity' => 0,
+        ]))->assertCreated();
+
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_updating_the_stock_records_a_signed_adjustment(): void
+    {
+        $user = $this->authenticate();
+
+        $product = Product::factory()->create([
+            'sku' => 'PRD-STOCK-003',
+            'stock_quantity' => 12,
+        ]);
+
+        $this->putJson("/api/products/{$product->id}", $this->productPayload([
+            'sku' => $product->sku,
+            'name' => $product->name,
+            'stock_quantity' => 10,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.stock_quantity', 10);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $product->id,
+            'user_id' => $user->id,
+            'type' => 'adjustment',
+            'quantity' => -2,
+        ]);
+
+        $movement = StockMovement::firstOrFail();
+
+        $this->assertStringContainsString('stock : 12 -> 10', $movement->note);
+    }
+
+    public function test_updating_a_product_without_stock_change_records_no_movement(): void
+    {
+        $this->authenticate();
+
+        $product = Product::factory()->create([
+            'sku' => 'PRD-STOCK-004',
+            'stock_quantity' => 12,
+        ]);
+
+        $this->putJson("/api/products/{$product->id}", $this->productPayload([
+            'sku' => $product->sku,
+            'name' => $product->name,
+            'stock_quantity' => 12,
+        ]))->assertOk();
+
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_updating_a_product_without_the_stock_field_records_no_movement(): void
+    {
+        $this->authenticate();
+
+        $product = Product::factory()->create([
+            'sku' => 'PRD-STOCK-005',
+            'stock_quantity' => 12,
+        ]);
+
+        $payload = $this->productPayload([
+            'sku' => $product->sku,
+            'name' => 'Nouveau nom',
+        ]);
+        unset($payload['stock_quantity']);
+
+        $this->putJson("/api/products/{$product->id}", $payload)
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Nouveau nom');
+
+        $this->assertSame(12, $product->fresh()->stock_quantity);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_an_employee_can_view_the_catalogue_without_purchase_price(): void
+    {
+        $this->authenticateAs('Employé');
+
+        $product = Product::factory()->create([
+            'sku' => 'PRD-EMP-001',
+            'purchase_price' => 12345,
+        ]);
+
+        $response = $this->getJson('/api/products')->assertOk();
+
+        $this->assertArrayNotHasKey('purchase_price', $response->json('data.0'));
+
+        $show = $this->getJson("/api/products/{$product->id}")->assertOk();
+
+        $this->assertArrayNotHasKey('purchase_price', $show->json('data'));
+        $this->assertSame($product->sale_price, $show->json('data.sale_price'));
+    }
+
+    public function test_an_employee_cannot_manage_products(): void
+    {
+        $this->authenticateAs('Employé');
+
+        $product = Product::factory()->create();
+
+        $this->postJson('/api/products', $this->productPayload([
+            'sku' => 'PRD-EMP-002',
+        ]))->assertForbidden();
+
+        $this->putJson("/api/products/{$product->id}", $this->productPayload([
+            'sku' => $product->sku,
+            'name' => $product->name,
+        ]))->assertForbidden();
+
+        $this->deleteJson("/api/products/{$product->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
     }
 }

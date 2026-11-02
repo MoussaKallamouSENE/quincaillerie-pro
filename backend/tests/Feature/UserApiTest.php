@@ -262,4 +262,138 @@ class UserApiTest extends TestCase
 
         $this->getJson('/api/users')->assertOk();
     }
+
+    public function test_a_manager_cannot_create_an_admin(): void
+    {
+        $this->authenticateAs('Gérant');
+
+        $this->postJson('/api/users', $this->payload([
+            'email' => 'admin.cree@quincaillerie.com',
+            'role' => 'Admin',
+        ]))->assertForbidden();
+
+        $this->assertDatabaseMissing('users', ['email' => 'admin.cree@quincaillerie.com']);
+    }
+
+    public function test_an_admin_can_create_an_admin(): void
+    {
+        $this->authenticateAs('Admin');
+
+        $this->postJson('/api/users', $this->payload([
+            'email' => 'admin.cree@quincaillerie.com',
+            'role' => 'Admin',
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.role', 'Admin');
+
+        $created = User::where('email', 'admin.cree@quincaillerie.com')->firstOrFail();
+
+        $this->assertTrue($created->hasRole('Admin'));
+    }
+
+    public function test_a_manager_cannot_update_an_admin(): void
+    {
+        $this->authenticateAs('Gérant');
+
+        $admin = User::factory()->create(['password' => 'motdepasse']);
+        $admin->assignRole($this->role('Admin'));
+
+        $this->putJson("/api/users/{$admin->id}", [
+            'name' => 'Nom modifié',
+            'password' => 'nouveaupasse',
+            'role' => 'Employé',
+            'is_active' => false,
+        ])->assertForbidden();
+
+        $admin->refresh();
+
+        $this->assertNotSame('Nom modifié', $admin->name);
+        $this->assertTrue(Hash::check('motdepasse', $admin->password));
+        $this->assertTrue($admin->hasRole('Admin'));
+        $this->assertTrue($admin->is_active);
+    }
+
+    public function test_a_manager_cannot_delete_an_admin(): void
+    {
+        $this->authenticateAs('Gérant');
+
+        $admin = User::factory()->create();
+        $admin->assignRole($this->role('Admin'));
+
+        $this->deleteJson("/api/users/{$admin->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    }
+
+    public function test_a_manager_can_update_an_employee(): void
+    {
+        $this->authenticateAs('Gérant');
+
+        $employee = User::factory()->create();
+        $employee->assignRole($this->role('Employé'));
+
+        $this->putJson("/api/users/{$employee->id}", ['name' => 'Nouveau Nom'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Nouveau Nom');
+    }
+
+    public function test_a_user_cannot_change_their_own_role(): void
+    {
+        $admin = $this->authenticateAs('Admin');
+
+        $this->putJson("/api/users/{$admin->id}", ['role' => 'Gérant'])
+            ->assertForbidden();
+
+        $this->assertTrue($admin->refresh()->hasRole('Admin'));
+    }
+
+    public function test_a_user_cannot_deactivate_their_own_account(): void
+    {
+        $admin = $this->authenticateAs('Admin');
+
+        $this->putJson("/api/users/{$admin->id}", ['is_active' => false])
+            ->assertForbidden();
+
+        $this->assertTrue($admin->refresh()->is_active);
+    }
+
+    public function test_deactivating_a_user_revokes_their_tokens(): void
+    {
+        $this->authenticateAs('Admin');
+
+        $user = User::factory()->create();
+        $user->assignRole($this->role('Employé'));
+        $user->createToken('api');
+
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+
+        $this->putJson("/api/users/{$user->id}", ['is_active' => false])
+            ->assertOk();
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+        $this->assertFalse($user->refresh()->is_active);
+    }
+
+    public function test_a_deactivated_user_cannot_use_an_existing_token(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole($this->role('Employé'));
+
+        $token = $user->createToken('api')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/me')
+            ->assertOk();
+
+        $user->update(['is_active' => false]);
+
+        // Chaque requete HTTP reelle repart d'un guard neuf : on reproduit ce
+        // comportement dans le test, sinon Laravel reutilise l'utilisateur
+        // authentifie de la requete precedente.
+        $this->app['auth']->forgetGuards();
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/me')
+            ->assertForbidden();
+    }
 }

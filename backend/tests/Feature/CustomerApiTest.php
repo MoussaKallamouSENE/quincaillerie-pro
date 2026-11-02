@@ -8,6 +8,7 @@ use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class CustomerApiTest extends TestCase
@@ -32,11 +33,21 @@ class CustomerApiTest extends TestCase
     }
 
     /**
-     * Authentifie l'utilisateur de la session.
+     * Authentifie l'utilisateur de la session avec le rôle demandé.
      */
-    private function authenticate(): void
+    private function authenticate(string $roleName = 'Admin'): User
     {
-        Sanctum::actingAs(User::factory()->create());
+        $role = Role::firstOrCreate([
+            'name' => $roleName,
+            'guard_name' => 'web',
+        ]);
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        Sanctum::actingAs($user);
+
+        return $user;
     }
 
     public function test_customers_are_listed_with_their_details(): void
@@ -169,6 +180,35 @@ class CustomerApiTest extends TestCase
             ->assertJsonPath('data.email', null);
     }
 
+    public function test_an_employee_can_create_a_customer_with_the_default_credit_limit(): void
+    {
+        $this->authenticate('Employé');
+
+        $this->postJson('/api/customers', ['name' => 'Client sans plafond'])
+            ->assertCreated()
+            ->assertJsonPath('data.credit_limit', '0.00');
+
+        $this->postJson('/api/customers', [
+            'name' => 'Client plafond par défaut',
+            'credit_limit' => 0,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.credit_limit', '0.00');
+
+        $this->assertDatabaseCount('customers', 2);
+    }
+
+    public function test_an_employee_cannot_create_a_customer_with_a_positive_credit_limit(): void
+    {
+        $this->authenticate('Employé');
+
+        $this->postJson('/api/customers', $this->customerPayload())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['credit_limit']);
+
+        $this->assertDatabaseCount('customers', 0);
+    }
+
     public function test_creating_a_customer_requires_valid_fields(): void
     {
         $this->authenticate();
@@ -231,6 +271,78 @@ class CustomerApiTest extends TestCase
             'name' => 'Moussa Diop Junior',
             'phone' => '+221 76 765 43 21',
             'is_active' => false,
+        ]);
+    }
+
+    public function test_an_employee_can_update_a_customer_without_changing_the_credit_limit(): void
+    {
+        $this->authenticate('Employé');
+
+        $customer = Customer::factory()->create([
+            'name' => 'Moussa Diop',
+            'credit_limit' => 500000,
+        ]);
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'name' => 'Moussa Diop Junior',
+            'credit_limit' => 500000,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Moussa Diop Junior')
+            ->assertJsonPath('data.credit_limit', '500000.00');
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'phone' => '+221 76 765 43 21',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.phone', '+221 76 765 43 21')
+            ->assertJsonPath('data.credit_limit', '500000.00');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'credit_limit' => 500000,
+        ]);
+    }
+
+    public function test_an_employee_cannot_change_an_existing_credit_limit(): void
+    {
+        $this->authenticate('Employé');
+
+        $customer = Customer::factory()->create(['credit_limit' => 500000]);
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'credit_limit' => 0,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['credit_limit']);
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'credit_limit' => 750000,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['credit_limit']);
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'credit_limit' => 500000,
+        ]);
+    }
+
+    public function test_a_manager_can_change_a_customer_credit_limit(): void
+    {
+        $this->authenticate('Gérant');
+
+        $customer = Customer::factory()->create(['credit_limit' => 0]);
+
+        $this->putJson("/api/customers/{$customer->id}", [
+            'credit_limit' => 750000,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.credit_limit', '750000.00');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'credit_limit' => 750000,
         ]);
     }
 

@@ -10,3 +10,9 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Donnees hors depot (deplacees vers /home/el-general/quincaillerie-archive)
+QuincailleriePro-restore-*/
+/scripts/
+backend/database/seeders/*.bak
+.cursor/

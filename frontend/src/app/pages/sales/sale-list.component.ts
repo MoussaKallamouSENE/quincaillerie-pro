@@ -169,6 +169,10 @@ export class SaleListComponent {
       const term = this.searchTerm().trim();
 
       const timer = setTimeout(() => {
+        if (term === this.appliedSearch() && this.currentPage() === 1) {
+          return;
+        }
+
         this.appliedSearch.set(term);
         this.currentPage.set(1);
       }, SEARCH_DELAY);
@@ -182,9 +186,12 @@ export class SaleListComponent {
     this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
-  /** Reinitialise le filtre de recherche. */
+  /** Reinitialise tous les filtres de l'historique. */
   protected clearSearch(): void {
     this.searchTerm.set('');
+    this.statusFilter.set('');
+    this.appliedSearch.set('');
+    this.currentPage.set(1);
   }
 
   /** Filtre l'historique sur le statut de reglement. */
@@ -197,7 +204,7 @@ export class SaleListComponent {
 
   /** Affiche la page demandee de l'historique. */
   protected goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages()) {
+    if (this.sales.isLoading() || page < 1 || page > this.totalPages()) {
       return;
     }
 
@@ -206,20 +213,24 @@ export class SaleListComponent {
 
   /** Affiche la page suivante de l'historique. */
   protected nextPage(): void {
-    if (this.hasNextPage()) {
+    if (!this.sales.isLoading() && this.hasNextPage()) {
       this.currentPage.update((page) => page + 1);
     }
   }
 
   /** Affiche la page precedente de l'historique. */
   protected previousPage(): void {
-    if (this.hasPreviousPage()) {
+    if (!this.sales.isLoading() && this.hasPreviousPage()) {
       this.currentPage.update((page) => page - 1);
     }
   }
 
   /** Relance le chargement de l'historique. */
   protected reload(): void {
+    if (this.sales.isLoading()) {
+      return;
+    }
+
     this.sales.reload();
   }
 
@@ -297,7 +308,7 @@ export class SaleListComponent {
     const amount = Number(this.paymentForm.amount);
     const due = Number(sale.balance_due);
 
-    if (! Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       this.paymentError.set('Le montant doit être supérieur à zéro.');
 
       return;

@@ -7,8 +7,11 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StockMovementController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UnitController;
@@ -20,6 +23,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::put('/profile/password', [ProfileController::class, 'changePassword']);
 
     Route::get('/products', [ProductController::class, 'index']);
     Route::get('/products/{product}', [ProductController::class, 'show'])->whereNumber('product');
@@ -37,6 +43,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Tableau de bord : statistiques agregees (montants masques aux employes).
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    Route::middleware('role:Admin|Gérant')->prefix('reports')->group(function () {
+        Route::get('/summary', [ReportsController::class, 'summary']);
+        Route::get('/{type}/pdf', [ReportsController::class, 'pdf']);
+        Route::get('/{type}', [ReportsController::class, 'index']);
+    });
+
+    Route::middleware('role:Admin')->prefix('settings/company')->group(function () {
+        Route::get('/', [SettingsController::class, 'company']);
+        Route::put('/', [SettingsController::class, 'updateCompany']);
+        Route::post('/logo', [SettingsController::class, 'uploadLogo']);
+    });
+    Route::get('/settings/company/logo', [SettingsController::class, 'logo'])->middleware('role:Admin|Gérant');
 
     // Utilisateurs : accessible aux comptes autorises a gérer les comptes.
     Route::apiResource('users', UserController::class)->middleware('can:gerer_utilisateurs');

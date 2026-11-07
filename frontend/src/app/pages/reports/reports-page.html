@@ -1,0 +1,826 @@
+<main class="space-y-6 text-slate-100 print:bg-white print:p-0 print:text-slate-900">
+  <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between print:hidden">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">
+        Pilotage commercial
+      </p>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Rapports</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+        Analysez les ventes, les achats, le stock, la caisse et les dépenses de la quincaillerie.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-800/60 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="loading() || (!summary() && !hasResults())"
+        (click)="print()"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V6.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.036"
+          />
+        </svg>
+        Imprimer
+      </button>
+
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="exporting() || loading()"
+        (click)="exportPdf()"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+          />
+        </svg>
+        {{ exporting() ? 'Préparation…' : 'Exporter en PDF' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="hidden print:mb-6 print:block print:border-b print:border-slate-300 print:pb-4">
+    <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Quincaillerie Pro</p>
+    <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ selectedLabel() }}</h1>
+    <p class="mt-1 text-sm text-slate-600">Période {{ periodLabel() }}</p>
+  </div>
+
+  <section
+    class="report-card rounded-xl border border-emerald-800/50 bg-[#153322] p-4 shadow-lg shadow-emerald-950/30 sm:p-5 print:hidden"
+  >
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 class="text-sm font-semibold text-slate-100">Filtres du rapport</h2>
+        <p class="mt-0.5 text-xs text-slate-400">
+          Le rapport et la recherche se mettent à jour automatiquement. Utilisez « Appliquer » pour
+          une période personnalisée.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+        [disabled]="loading() || !hasActiveFilters()"
+        aria-label="Réinitialiser la période, les dates et la recherche"
+        (click)="resetFilters()"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+          />
+        </svg>
+        Réinitialiser les filtres
+      </button>
+    </div>
+
+    <form class="space-y-4" (ngSubmit)="applyFilters()">
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-12 xl:items-end">
+        <label class="text-sm font-medium text-slate-300 md:col-span-1 xl:col-span-3">
+          Période
+          <select
+            name="period"
+            class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            [ngModel]="period()"
+            (ngModelChange)="onPeriodChange($any($event))"
+          >
+            @for (item of periods; track item.id) {
+              <option [ngValue]="item.id">{{ item.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="text-sm font-medium text-slate-300 md:col-span-1 xl:col-span-4">
+          Rapport
+          <select
+            name="type"
+            class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            [ngModel]="selectedType()"
+            [disabled]="customRangeInvalid()"
+            (ngModelChange)="onTypeChange($any($event))"
+          >
+            @for (item of types; track item.id) {
+              <option [ngValue]="item.id">{{ item.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="text-sm font-medium text-slate-300 md:col-span-1 xl:col-span-3">
+          Recherche
+          <span class="relative mt-1.5 block">
+            <svg
+              class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-500"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+              />
+            </svg>
+            <input
+              type="search"
+              name="search"
+              autocomplete="off"
+              placeholder="Référence, nom, téléphone…"
+              class="h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 pr-10 pl-10 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              [ngModel]="searchTerm()"
+              (ngModelChange)="onSearchChange($event)"
+            />
+            @if (searchTerm()) {
+              <button
+                type="button"
+                class="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-emerald-900/50 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none"
+                aria-label="Effacer la recherche"
+                (click)="clearSearch()"
+              >
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            }
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2 xl:col-span-2"
+          [disabled]="loading()"
+        >
+          <svg
+            class="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"
+            />
+          </svg>
+          Appliquer
+        </button>
+      </div>
+
+      @if (period() === 'custom') {
+        <div class="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm font-semibold text-slate-200">Période personnalisée</p>
+            <p class="text-xs text-slate-400">La date de fin inclut toute la journée.</p>
+          </div>
+
+          <div class="mt-3 grid gap-4 sm:grid-cols-2">
+            <label class="text-sm font-medium text-slate-300">
+              Du
+              <input
+                type="date"
+                name="from"
+                class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 outline-none transition [color-scheme:dark] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                [ngModel]="from()"
+                (ngModelChange)="from.set($event)"
+              />
+            </label>
+            <label class="text-sm font-medium text-slate-300">
+              Au
+              <input
+                type="date"
+                name="to"
+                class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 outline-none transition [color-scheme:dark] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                [ngModel]="to()"
+                (ngModelChange)="to.set($event)"
+              />
+            </label>
+          </div>
+
+          @if (customRangeError(); as message) {
+            <p
+              role="alert"
+              class="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-200"
+            >
+              {{ message }}
+            </p>
+          }
+        </div>
+      }
+    </form>
+  </section>
+
+  @if (loading()) {
+    <div
+      class="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200 print:hidden"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        class="h-4 w-4 animate-spin rounded-full border-2 border-emerald-300/30 border-t-emerald-300"
+        aria-hidden="true"
+      ></span>
+      {{ summary() || page() ? 'Actualisation des rapports…' : 'Chargement des rapports…' }}
+    </div>
+  }
+
+  @if (error(); as message) {
+    <div
+      role="alert"
+      class="flex flex-col gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-300 sm:flex-row sm:items-center sm:justify-between print:hidden"
+    >
+      <div class="flex items-start gap-3">
+        <span
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-300 ring-1 ring-red-500/20"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+        </span>
+        <div>
+          <p class="font-semibold">Impossible de charger les données</p>
+          <p class="mt-1 text-sm text-red-300">{{ message }}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-red-500/40 px-3 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 focus-visible:ring-2 focus-visible:ring-red-400/60 focus-visible:outline-none"
+        (click)="load()"
+      >
+        Réessayer
+      </button>
+    </div>
+  }
+
+  @if (loading() && !summary()) {
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+      @for (item of [1, 2, 3, 4]; track item) {
+        <div class="h-32 animate-pulse rounded-xl border border-emerald-800/50 bg-[#153322]"></div>
+      }
+    </section>
+
+    <section class="grid gap-5 xl:grid-cols-5" aria-hidden="true">
+      <div
+        class="h-80 animate-pulse rounded-xl border border-emerald-800/50 bg-[#153322] xl:col-span-3"
+      ></div>
+      <div
+        class="h-80 animate-pulse rounded-xl border border-emerald-800/50 bg-[#153322] xl:col-span-2"
+      ></div>
+    </section>
+  }
+
+  @if (summary(); as data) {
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <article
+        class="report-card rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-400">Chiffre d’affaires</p>
+            <p class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-100">
+              {{ money(data.metrics.revenue) }}
+            </p>
+            <p class="mt-2 text-xs text-slate-400">Ventes enregistrées sur la période</p>
+          </div>
+          <span
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
+            aria-hidden="true"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </span>
+        </div>
+      </article>
+
+      <article
+        class="report-card rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-400">Ventes enregistrées</p>
+            <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
+              {{ count(data.metrics.sales_count) }}
+            </p>
+            <p class="mt-2 text-xs text-slate-400">Transactions sur la période</p>
+          </div>
+          <span
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
+            aria-hidden="true"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
+              />
+            </svg>
+          </span>
+        </div>
+      </article>
+
+      <article
+        class="report-card rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-400">Achats réceptionnés</p>
+            <p class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-100">
+              {{ money(data.metrics.received_purchases) }}
+            </p>
+            <p class="mt-2 text-xs text-slate-400">
+              {{ count(data.metrics.received_purchases_count) }} réception(s)
+            </p>
+          </div>
+          <span
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20"
+            aria-hidden="true"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+              />
+            </svg>
+          </span>
+        </div>
+      </article>
+
+      <article
+        class="report-card rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-400">Dépenses</p>
+            <p class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-100">
+              {{ money(data.metrics.expenses) }}
+            </p>
+            <p class="mt-2 text-xs text-slate-400">Sorties d’argent enregistrées</p>
+          </div>
+          <span
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-300 ring-1 ring-red-500/20"
+            aria-hidden="true"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m-18 0h16.5m-16.5 0h-.375c-.621 0-1.125-.504-1.125-1.125V6.75c0-.621.504-1.125 1.125-1.125H3.75m6 6.75h6.75"
+              />
+            </svg>
+          </span>
+        </div>
+      </article>
+    </section>
+
+    @if (data.notes.length) {
+      <section
+        aria-labelledby="report-notes-title"
+        class="report-card rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm leading-6 text-amber-100/90 print:break-inside-avoid print:border-amber-300 print:bg-white print:text-slate-700"
+      >
+        <p id="report-notes-title" class="font-semibold text-amber-200 print:text-slate-900">
+          À propos des indicateurs
+        </p>
+        <ul class="mt-2 space-y-1.5">
+          @for (note of data.notes; track note) {
+            <li class="flex gap-2">
+              <span
+                class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400 print:bg-slate-500"
+              ></span>
+              <span>{{ note }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <section class="grid gap-5 xl:grid-cols-5">
+      <article
+        class="report-card min-w-0 rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30 xl:col-span-3"
+      >
+        <header class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold text-slate-100">Évolution des ventes</h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Chiffre d’affaires des jours ou mois ayant enregistré des ventes.
+            </p>
+          </div>
+          <span
+            class="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-500/20"
+          >
+            {{ money(data.metrics.revenue) }}
+          </span>
+        </header>
+
+        @if (chart().points.length) {
+          <div #chartContainer class="mt-5 overflow-x-auto pb-1">
+            <svg
+              class="h-auto max-w-none"
+              role="img"
+              aria-label="Évolution du chiffre d’affaires"
+              [attr.viewBox]="'0 0 ' + chart().width + ' ' + chart().height"
+              [attr.width]="chart().width"
+              [attr.height]="chart().height"
+            >
+              @for (tick of chart().ticks; track tick.y) {
+                <line
+                  [attr.x1]="chart().left"
+                  [attr.x2]="chart().right"
+                  [attr.y1]="tick.y"
+                  [attr.y2]="tick.y"
+                  class="stroke-emerald-800/50"
+                  stroke-dasharray="3 4"
+                />
+                <text
+                  [attr.x]="chart().left - 12"
+                  [attr.y]="tick.y + 3"
+                  text-anchor="end"
+                  class="fill-slate-400 text-[11px]"
+                >
+                  {{ tick.label }}
+                </text>
+              }
+
+              <line
+                [attr.x1]="chart().left"
+                [attr.x2]="chart().right"
+                [attr.y1]="chart().plotBottom"
+                [attr.y2]="chart().plotBottom"
+                class="stroke-emerald-700/60"
+              />
+
+              @for (point of chart().points; track point.bucket) {
+                <g>
+                  <title>{{ point.tooltip }}</title>
+                  <rect
+                    [attr.x]="point.x"
+                    [attr.y]="point.y"
+                    [attr.width]="point.width"
+                    [attr.height]="point.height"
+                    rx="4"
+                    class="fill-emerald-500 transition hover:fill-emerald-400 print:fill-slate-700"
+                  />
+                  @if (chart().points.length <= 14) {
+                    <text
+                      [attr.x]="point.x + point.width / 2"
+                      [attr.y]="point.y - 6"
+                      text-anchor="middle"
+                      class="fill-emerald-200 text-[11px] print:fill-slate-700"
+                    >
+                      {{ point.valueLabel }}
+                    </text>
+                  }
+                  <text
+                    [attr.x]="point.x + point.width / 2"
+                    [attr.y]="chart().labelY"
+                    text-anchor="middle"
+                    class="fill-slate-400 text-[11px]"
+                  >
+                    {{ point.label }}
+                  </text>
+                </g>
+              }
+            </svg>
+          </div>
+          <p class="mt-2 text-xs text-slate-400">
+            Les jours ou mois sans vente ne sont pas représentés.
+          </p>
+        } @else {
+          <div
+            class="mt-5 rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-10 text-center"
+          >
+            <span
+              class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+              aria-hidden="true"
+            >
+              <svg
+                class="h-6 w-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                />
+              </svg>
+            </span>
+            <p class="mt-4 text-sm font-medium text-slate-200">Aucune vente sur cette période</p>
+            <p class="mt-1 text-sm text-slate-400">
+              Les ventes enregistrées apparaîtront dans ce graphique.
+            </p>
+          </div>
+        }
+      </article>
+
+      <article
+        class="report-card min-w-0 rounded-xl border border-emerald-800/50 bg-[#153322] p-5 shadow-lg shadow-emerald-950/30 xl:col-span-2"
+      >
+        <header>
+          <h2 class="text-base font-semibold text-slate-100">Produits les plus vendus</h2>
+          <p class="mt-1 text-sm text-slate-400">Classement par quantité vendue sur la période.</p>
+        </header>
+
+        @if (topProducts().length) {
+          <ol class="mt-4 space-y-4">
+            @for (item of topProducts(); track item.id) {
+              <li>
+                <div class="flex items-start gap-3">
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/25"
+                  >
+                    {{ item.rank }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline justify-between gap-3">
+                      <p class="truncate font-medium text-slate-100">{{ item.name }}</p>
+                      <p class="shrink-0 text-sm font-semibold text-slate-100">
+                        {{ count(item.quantity) }}
+                        <span class="text-xs font-normal text-slate-400">vendu(s)</span>
+                      </p>
+                    </div>
+                    <div
+                      class="mt-1 flex items-center justify-between gap-3 text-xs text-slate-400"
+                    >
+                      <span class="truncate">{{ item.sku }}</span>
+                      <span class="shrink-0">{{ money(item.revenue) }}</span>
+                    </div>
+                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-emerald-950/60">
+                      <div
+                        class="h-full rounded-full bg-emerald-500"
+                        [style.width.%]="item.share"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            }
+          </ol>
+        } @else {
+          <div
+            class="mt-5 rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-10 text-center"
+          >
+            <span
+              class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+              aria-hidden="true"
+            >
+              <svg
+                class="h-6 w-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+                />
+              </svg>
+            </span>
+            <p class="mt-4 text-sm font-medium text-slate-200">Aucun produit vendu</p>
+            <p class="mt-1 text-sm text-slate-400">
+              Les lignes de vente de la période alimenteront ce classement.
+            </p>
+          </div>
+        }
+      </article>
+    </section>
+  }
+
+  <section
+    class="report-card overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30 print:border-slate-300"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/40 p-4 sm:p-5 print:border-slate-300"
+    >
+      <div>
+        <h2 class="text-base font-semibold text-slate-100 print:text-slate-900">
+          {{ selectedLabel() }}
+        </h2>
+        <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
+          {{ count(meta()?.total ?? 0) }} résultat(s)
+          @if (periodLabel()) {
+            <span> · {{ periodLabel() }}</span>
+          }
+        </p>
+      </div>
+    </header>
+
+    @if (loading() && !page()) {
+      <div class="space-y-3 p-4 sm:p-5" aria-hidden="true">
+        @for (row of [1, 2, 3, 4, 5]; track row) {
+          <div class="h-11 animate-pulse rounded-lg bg-emerald-800/40"></div>
+        }
+      </div>
+    } @else if (hasResults()) {
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm" [style.min-width.px]="tableMinWidth()">
+          <caption class="sr-only">
+            {{
+              selectedLabel()
+            }}
+            —
+            {{
+              periodLabel()
+            }}
+          </caption>
+          <thead
+            class="bg-emerald-950/40 text-xs tracking-wide text-slate-400 uppercase print:bg-slate-100 print:text-slate-700"
+          >
+            <tr>
+              @for (column of columns(); track column.key; let columnIndex = $index) {
+                <th
+                  scope="col"
+                  class="px-4 py-3 font-semibold whitespace-nowrap"
+                  [class.text-right]="column.align === 'right'"
+                  [class.text-center]="column.align === 'center'"
+                >
+                  {{ column.label }}
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-emerald-800/30 print:divide-slate-300">
+            @for (row of rows(); track $index) {
+              <tr class="transition hover:bg-emerald-900/30 print:hover:bg-transparent">
+                @for (column of columns(); track column.key; let columnIndex = $index) {
+                  <td
+                    class="max-w-72 px-4 py-3.5 align-top text-slate-200 print:text-slate-800"
+                    [class.text-right]="column.align === 'right'"
+                    [class.text-center]="column.align === 'center'"
+                    [class.tabular-nums]="column.align === 'right' || column.align === 'center'"
+                  >
+                    @if (isStatusColumn(columnIndex)) {
+                      <span
+                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
+                        [class]="statusBadgeClass(row, columnIndex)"
+                      >
+                        {{ cellValue(row, columnIndex) }}
+                      </span>
+                    } @else {
+                      {{ cellValue(row, columnIndex) }}
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <footer
+        class="flex flex-col gap-3 border-t border-emerald-800/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5 print:hidden"
+      >
+        <p class="text-slate-400">
+          <span class="font-medium text-slate-200">{{ count(meta()?.total ?? 0) }}</span>
+          résultat(s)
+          <span class="text-slate-600">·</span>
+          Page {{ meta()?.current_page ?? 1 }} sur {{ meta()?.last_page ?? 1 }}
+        </p>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            [disabled]="loading() || customRangeInvalid() || !hasPreviousPage()"
+            (click)="changePage((meta()?.current_page ?? 1) - 1)"
+          >
+            Précédent
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            [disabled]="loading() || customRangeInvalid() || !hasNextPage()"
+            (click)="changePage((meta()?.current_page ?? 1) + 1)"
+          >
+            Suivant
+          </button>
+        </div>
+      </footer>
+    } @else {
+      <div class="p-10 text-center print:p-4">
+        <span
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25 print:hidden"
+          aria-hidden="true"
+        >
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+            />
+          </svg>
+        </span>
+        <p class="mt-4 text-sm font-semibold text-slate-200 print:mt-0 print:text-slate-900">
+          @if (hasActiveSearch()) {
+            Aucun résultat pour « {{ appliedSearch() }} »
+          } @else {
+            Aucune donnée pour cette période
+          }
+        </p>
+        <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
+          @if (hasActiveSearch()) {
+            Essayez un autre nom, une autre référence ou effacez la recherche.
+          } @else {
+            Modifiez la période ou choisissez un autre rapport pour afficher des données.
+          }
+        </p>
+        @if (hasActiveSearch()) {
+          <button
+            type="button"
+            class="mt-4 inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none print:hidden"
+            (click)="clearSearch()"
+          >
+            Effacer la recherche
+          </button>
+        }
+      </div>
+    }
+  </section>
+</main>

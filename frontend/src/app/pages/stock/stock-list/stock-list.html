@@ -3,13 +3,31 @@
     <h1 class="text-2xl font-bold text-emerald-400">Gestion du Stock</h1>
   </div>
 
+  @if (loadError()) {
+    <div
+      role="alert"
+      class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+    >
+      <p>{{ loadError() }}</p>
+      <button
+        type="button"
+        (click)="loadData()"
+        class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/15"
+      >
+        Réessayer
+      </button>
+    </div>
+  }
+
   <!-- Tableau de l'état du stock -->
   <div class="bg-[#153322] rounded-xl border border-emerald-800/50 p-6 mb-8 shadow-lg">
     <h2 class="text-lg font-semibold mb-4 text-white">État du stock actuel</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-left border-collapse">
         <thead>
-          <tr class="text-emerald-500 border-b border-emerald-800/50 text-sm uppercase tracking-wider">
+          <tr
+            class="text-emerald-500 border-b border-emerald-800/50 text-sm uppercase tracking-wider"
+          >
             <th class="p-3">Produit</th>
             <th class="p-3">SKU</th>
             <th class="p-3">Stock Actuel</th>
@@ -17,20 +35,32 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let p of products()" class="border-b border-emerald-800/20 hover:bg-emerald-900/20 transition">
+          <tr
+            *ngFor="let p of products()"
+            class="border-b border-emerald-800/20 hover:bg-emerald-900/20 transition"
+          >
             <td class="p-3 font-medium">{{ p.name }}</td>
             <td class="p-3 text-slate-400">{{ p.sku }}</td>
-            <td class="p-3 font-bold" [class.text-red-400]="p.stock_quantity <= p.min_stock_alert" [class.text-emerald-400]="p.stock_quantity > p.min_stock_alert">
+            <td
+              class="p-3 font-bold"
+              [class.text-red-400]="p.stock_quantity <= p.min_stock_alert"
+              [class.text-emerald-400]="p.stock_quantity > p.min_stock_alert"
+            >
               {{ p.stock_quantity }}
             </td>
             <td *ngIf="canAdjust()" class="p-3 text-right">
-              <button (click)="openModal(p)" class="bg-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium text-white hover:bg-emerald-500 transition shadow-md">
+              <button
+                (click)="openModal(p)"
+                class="bg-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium text-white hover:bg-emerald-500 transition shadow-md"
+              >
                 Ajuster
               </button>
             </td>
           </tr>
-          <tr *ngIf="products().length === 0">
-            <td [attr.colspan]="canAdjust() ? 4 : 3" class="p-4 text-center text-slate-400">Aucun produit trouvé.</td>
+          <tr *ngIf="products().length === 0 && !loadError()">
+            <td [attr.colspan]="canAdjust() ? 4 : 3" class="p-4 text-center text-slate-400">
+              Aucun produit trouvé.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -43,7 +73,9 @@
     <div class="overflow-x-auto">
       <table class="w-full text-left border-collapse">
         <thead>
-          <tr class="text-emerald-500 border-b border-emerald-800/50 text-sm uppercase tracking-wider">
+          <tr
+            class="text-emerald-500 border-b border-emerald-800/50 text-sm uppercase tracking-wider"
+          >
             <th class="p-3">Date</th>
             <th class="p-3">Produit</th>
             <th class="p-3">Type</th>
@@ -52,21 +84,31 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let m of movements()" class="border-b border-emerald-800/20 hover:bg-emerald-900/20 transition">
-            <td class="p-3 text-slate-400 text-sm">{{ m.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+          <tr
+            *ngFor="let m of movements()"
+            class="border-b border-emerald-800/20 hover:bg-emerald-900/20 transition"
+          >
+            <td class="p-3 text-slate-400 text-sm">
+              {{ m.created_at | date: 'dd/MM/yyyy HH:mm' }}
+            </td>
             <td class="p-3 font-medium">{{ m.product?.name }}</td>
             <td class="p-3">
-              <span class="px-2 py-1 rounded text-xs font-bold uppercase"
-                [class.bg-green-900]="m.type === 'in'" [class.text-green-400]="m.type === 'in'"
-                [class.bg-red-900]="m.type === 'out'" [class.text-red-400]="m.type === 'out'"
-                [class.bg-yellow-900]="m.type === 'adjustment'" [class.text-yellow-400]="m.type === 'adjustment'">
+              <span
+                class="px-2 py-1 rounded text-xs font-bold uppercase"
+                [class.bg-green-900]="m.type === 'in'"
+                [class.text-green-400]="m.type === 'in'"
+                [class.bg-red-900]="m.type === 'out'"
+                [class.text-red-400]="m.type === 'out'"
+                [class.bg-yellow-900]="m.type === 'adjustment'"
+                [class.text-yellow-400]="m.type === 'adjustment'"
+              >
                 {{ m.type === 'in' ? 'Entrée' : m.type === 'out' ? 'Sortie' : 'Ajust.' }}
               </span>
             </td>
             <td class="p-3 font-bold">{{ movementQuantity(m) }}</td>
             <td class="p-3 text-slate-400 text-sm">{{ m.note }}</td>
           </tr>
-          <tr *ngIf="movements().length === 0">
+          <tr *ngIf="movements().length === 0 && !loadError()">
             <td colspan="5" class="p-4 text-center text-slate-400">Aucun mouvement enregistré.</td>
           </tr>
         </tbody>
@@ -75,13 +117,19 @@
   </div>
 
   <!-- Modale d'ajustement -->
-  <div *ngIf="showModal() && canAdjust()" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div
+    *ngIf="showModal() && canAdjust()"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm"
+  >
     <div class="bg-[#153322] p-6 rounded-2xl w-full max-w-md border border-emerald-700 shadow-2xl">
       <h3 class="text-xl font-bold mb-4 text-white">Ajuster le stock</h3>
 
       <div class="mb-4">
         <label class="block mb-2 text-sm text-slate-300">Type d'opération</label>
-        <select [(ngModel)]="adjustment.type" class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        <select
+          [(ngModel)]="adjustment.type"
+          class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+        >
           <option value="in">Entrée (Ajouter au stock)</option>
           <option value="out">Sortie (Retirer du stock)</option>
           <option value="adjustment">Ajustement (Définir le stock exact)</option>
@@ -90,17 +138,49 @@
 
       <div class="mb-4">
         <label class="block mb-2 text-sm text-slate-300">Quantité</label>
-        <input type="number" [(ngModel)]="adjustment.quantity" [min]="adjustment.type === 'adjustment' ? 0 : 1" class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        <input
+          type="number"
+          [(ngModel)]="adjustment.quantity"
+          [min]="adjustment.type === 'adjustment' ? 0 : 1"
+          class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+        />
       </div>
 
       <div class="mb-6">
         <label class="block mb-2 text-sm text-slate-300">Motif (Obligatoire)</label>
-        <input type="text" [(ngModel)]="adjustment.reason" placeholder="Ex: Casse, Inventaire, Erreur..." class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+        <input
+          type="text"
+          [(ngModel)]="adjustment.reason"
+          placeholder="Ex: Casse, Inventaire, Erreur..."
+          class="w-full p-2.5 bg-[#0a1912] rounded-lg border border-emerald-800 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+        />
       </div>
 
       <div class="flex justify-end gap-3">
-        <button (click)="showModal.set(false)" class="px-5 py-2 rounded-lg text-slate-300 hover:bg-emerald-900/50 transition">Annuler</button>
-        <button (click)="onSubmit()" [disabled]="!adjustment.reason || adjustment.quantity < 0 || (adjustment.type !== 'adjustment' && adjustment.quantity < 1)" class="px-5 py-2 bg-emerald-600 rounded-lg text-white font-medium hover:bg-emerald-500 transition disabled:opacity-50">Valider</button>
+        <button
+          type="button"
+          (click)="closeModal()"
+          [disabled]="saving()"
+          class="px-5 py-2 rounded-lg text-slate-300 hover:bg-emerald-900/50 transition disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          (click)="onSubmit()"
+          [disabled]="
+            saving() ||
+            !adjustment.reason ||
+            adjustment.quantity === '' ||
+            adjustment.quantity === null ||
+            adjustment.quantity === undefined ||
+            adjustment.quantity < 0 ||
+            (adjustment.type !== 'adjustment' && adjustment.quantity < 1)
+          "
+          class="px-5 py-2 bg-emerald-600 rounded-lg text-white font-medium hover:bg-emerald-500 transition disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {{ saving() ? 'Mise à jour…' : 'Valider' }}
+        </button>
       </div>
     </div>
   </div>

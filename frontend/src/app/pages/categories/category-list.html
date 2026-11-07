@@ -3,9 +3,7 @@
   <div class="flex flex-wrap items-end justify-between gap-4">
     <div>
       <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Catégories</h1>
-      <p class="mt-1 text-sm text-slate-400">
-        Organisez le catalogue par familles de produits
-      </p>
+      <p class="mt-1 text-sm text-slate-400">Organisez le catalogue par familles de produits</p>
     </div>
 
     <button
@@ -13,7 +11,14 @@
       (click)="openCreate()"
       class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
     >
-      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <svg
+        class="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-hidden="true"
+      >
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
       </svg>
       Nouvelle catégorie
@@ -21,11 +26,26 @@
   </div>
 
   <!-- Liste -->
-  <section class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30">
-    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4">
+  <section
+    class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+    >
       <div class="relative w-full max-w-sm">
-        <svg class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z" />
+        <svg
+          class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+          />
         </svg>
         <input
           type="search"
@@ -54,10 +74,18 @@
           <tbody class="divide-y divide-emerald-800/30">
             @for (row of [1, 2, 3, 4, 5]; track row) {
               <tr>
-                <td class="px-6 py-4"><div class="h-3.5 w-40 animate-pulse rounded bg-emerald-800/50"></div></td>
-                <td class="px-6 py-4"><div class="h-3.5 w-56 animate-pulse rounded bg-emerald-800/40"></div></td>
-                <td class="px-6 py-4"><div class="h-3.5 w-28 animate-pulse rounded bg-emerald-800/40"></div></td>
-                <td class="px-6 py-4"><div class="h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div></td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-40 animate-pulse rounded bg-emerald-800/50"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-56 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-28 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-3.5 w-20 animate-pulse rounded bg-emerald-800/40"></div>
+                </td>
               </tr>
             }
           </tbody>
@@ -91,16 +119,22 @@
             @for (category of filteredCategories(); track category.id) {
               <tr class="transition hover:bg-emerald-900/20">
                 <td class="px-6 py-4 font-medium text-slate-100">{{ category.name }}</td>
-                <td class="max-w-xs truncate px-6 py-4 text-slate-400">{{ category.description || '—' }}</td>
+                <td class="max-w-xs truncate px-6 py-4 text-slate-400">
+                  {{ category.description || '—' }}
+                </td>
                 <td class="px-6 py-4 text-slate-300">{{ parentName(category) }}</td>
                 <td class="px-6 py-4 text-slate-300">{{ category.products_count ?? 0 }}</td>
                 <td class="px-6 py-4">
                   @if (category.is_active) {
-                    <span class="inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/25">
+                    <span
+                      class="inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/25"
+                    >
                       Active
                     </span>
                   } @else {
-                    <span class="inline-flex rounded-full bg-slate-500/15 px-2.5 py-1 text-xs font-semibold text-slate-300 ring-1 ring-slate-500/25">
+                    <span
+                      class="inline-flex rounded-full bg-slate-500/15 px-2.5 py-1 text-xs font-semibold text-slate-300 ring-1 ring-slate-500/25"
+                    >
                       Inactive
                     </span>
                   }
@@ -117,9 +151,10 @@
                     <button
                       type="button"
                       (click)="remove(category)"
-                      class="rounded-lg border border-red-800/50 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+                      [disabled]="deletingId() !== null"
+                      class="rounded-lg border border-red-800/50 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Supprimer
+                      {{ deletingId() === category.id ? 'Suppression…' : 'Supprimer' }}
                     </button>
                   </div>
                 </td>
@@ -168,7 +203,10 @@
           </div>
 
           <div>
-            <label for="category-description" class="mb-1.5 block text-sm font-medium text-slate-300">
+            <label
+              for="category-description"
+              class="mb-1.5 block text-sm font-medium text-slate-300"
+            >
               Description
             </label>
             <textarea
@@ -210,7 +248,10 @@
           </label>
 
           @if (formError()) {
-            <p class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">
+            <p
+              class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              role="alert"
+            >
               {{ formError() }}
             </p>
           }

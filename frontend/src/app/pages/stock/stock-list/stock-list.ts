@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { StockService } from '../../../services/stock';
 import { ProductService } from '../../../services/product-service';
 import { AuthService } from '../../../core/auth/auth-service';
@@ -11,7 +12,7 @@ import { extractErrorMessage } from '../../../core/http/api-error';
   selector: 'app-stock-list',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './stock-list.html'
+  templateUrl: './stock-list.html',
 })
 export class StockListComponent implements OnInit {
   private readonly stockService = inject(StockService);
@@ -24,6 +25,8 @@ export class StockListComponent implements OnInit {
   readonly products = signal<any[]>([]);
   readonly movements = signal<any[]>([]);
   readonly showModal = signal(false);
+  readonly saving = signal(false);
+  readonly loadError = signal<string | null>(null);
   adjustment: any = { product_id: null, type: 'in', quantity: 1, reason: '' };
 
   /** Seuls les responsables peuvent ajuster le stock. */
@@ -34,6 +37,8 @@ export class StockListComponent implements OnInit {
   }
 
   loadData() {
+    this.loadError.set(null);
+
     this.productService.getProducts({ per_page: 100 }).subscribe({
       next: (res: any) => {
         // Si Laravel renvoie { data: [...] }, on prend res.data, sinon res
@@ -50,7 +55,10 @@ export class StockListComponent implements OnInit {
       error: (err) => {
         console.error('Erreur produits:', err);
         this.products.set([]);
-      }
+        this.loadError.set(
+          extractErrorMessage(err, 'Impossible de charger les produits du stock.'),
+        );
+      },
     });
 
     this.stockService.getMovements().subscribe({
@@ -68,7 +76,10 @@ export class StockListComponent implements OnInit {
       error: (err) => {
         console.error('Erreur mouvements:', err);
         this.movements.set([]);
-      }
+        this.loadError.set(
+          extractErrorMessage(err, 'Impossible de charger les mouvements de stock.'),
+        );
+      },
     });
   }
 
@@ -76,7 +87,7 @@ export class StockListComponent implements OnInit {
   movementQuantity(movement: { type: string; quantity: number | string }): number {
     const quantity = Number(movement.quantity);
 
-    if (! Number.isFinite(quantity)) {
+    if (!Number.isFinite(quantity)) {
       return 0;
     }
 
@@ -92,22 +103,55 @@ export class StockListComponent implements OnInit {
     this.showModal.set(true);
   }
 
-  onSubmit() {
-    if (!this.canAdjust()) {
+  closeModal() {
+    if (this.saving()) {
       return;
     }
 
-    this.stockService.createMovement(this.adjustment).subscribe({
-      next: () => {
-        this.showModal.set(false);
-        this.loadData();
-        this.toastService.success('Stock mis à jour avec succès.');
-      },
-      error: (err) => {
-        this.toastService.error(
-          extractErrorMessage(err, 'Impossible de mettre à jour le stock.'),
-        );
-      }
-    });
+    this.showModal.set(false);
+  }
+
+  onSubmit() {
+    if (!this.canAdjust() || this.saving()) {
+      return;
+    }
+
+    const rawQuantity = this.adjustment.quantity;
+    const quantity = Number(rawQuantity);
+    const reason = String(this.adjustment.reason ?? '').trim();
+    const isAdjustment = this.adjustment.type === 'adjustment';
+
+    if (
+      rawQuantity === '' ||
+      rawQuantity === null ||
+      !Number.isInteger(quantity) ||
+      quantity < 0 ||
+      (!isAdjustment && quantity < 1)
+    ) {
+      this.toastService.error('Saisissez une quantité valide.');
+      return;
+    }
+
+    if (!reason) {
+      this.toastService.error('Indiquez le motif de l’ajustement.');
+      return;
+    }
+
+    this.saving.set(true);
+    this.stockService
+      .createMovement({ ...this.adjustment, quantity, reason })
+      .pipe(finalize(() => this.saving.set(false)))
+      .subscribe({
+        next: () => {
+          this.showModal.set(false);
+          this.loadData();
+          this.toastService.success('Stock mis à jour avec succès.');
+        },
+        error: (err) => {
+          this.toastService.error(
+            extractErrorMessage(err, 'Impossible de mettre à jour le stock.'),
+          );
+        },
+      });
   }
 }

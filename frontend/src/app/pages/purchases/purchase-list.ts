@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { finalize } from 'rxjs';
 import { AuthService } from '../../core/auth/auth-service';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { ToastService } from '../../core/toast/toast-service';
@@ -26,33 +28,43 @@ export class PurchaseListComponent implements OnInit {
   private readonly supplierService = inject(SupplierService);
   private readonly productService = inject(ProductService);
   private readonly toastService = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly auth = inject(AuthService);
 
   readonly purchases = signal<Purchase[]>([]);
   readonly suppliers = signal<any[]>([]);
   readonly products = signal<any[]>([]);
   readonly loading = signal(false);
+  readonly loadError = signal<string | null>(null);
   readonly showModal = signal(false);
   readonly submitting = signal(false);
   readonly selectedPurchase = signal<Purchase | null>(null);
   readonly loadingDetail = signal(false);
   readonly cancelling = signal(false);
+  readonly receivingPurchaseId = signal<number | null>(null);
 
   supplierId: number | null = null;
   lines: PurchaseLine[] = [{ product_id: null, quantity: 1, unit_price: 0 }];
+  private pendingProductId: number | null = null;
 
-  protected readonly canManagePurchases = computed(() =>
-    this.auth.hasRole('Admin', 'Gérant'),
-  );
+  protected readonly canManagePurchases = computed(() => this.auth.hasRole('Admin', 'Gérant'));
 
   ngOnInit(): void {
+    const productId = Number(this.route.snapshot.queryParamMap.get('product'));
+    this.pendingProductId = Number.isInteger(productId) && productId > 0 ? productId : null;
+
     this.loadPurchases();
     this.loadSuppliers();
     this.loadProducts();
   }
 
   loadPurchases(): void {
+    if (this.loading()) {
+      return;
+    }
+
     this.loading.set(true);
+    this.loadError.set(null);
     this.purchaseService.getPurchases().subscribe({
       next: (res: any) => {
         if (Array.isArray(res)) {
@@ -67,6 +79,7 @@ export class PurchaseListComponent implements OnInit {
       error: (err) => {
         console.error('Erreur achats:', err);
         this.loading.set(false);
+        this.loadError.set(extractErrorMessage(err, 'Impossible de charger les achats.'));
         this.purchases.set([]);
       },
     });
@@ -96,8 +109,34 @@ export class PurchaseListComponent implements OnInit {
         } else {
           this.products.set([]);
         }
+
+        this.openPendingProduct();
       },
     });
+  }
+
+  private openPendingProduct(): void {
+    const productId = this.pendingProductId;
+    this.pendingProductId = null;
+
+    if (productId === null || !this.canManagePurchases()) {
+      return;
+    }
+
+    const product = this.products().find((candidate) => Number(candidate.id) === productId);
+
+    if (!product) {
+      return;
+    }
+
+    this.openModal();
+    this.lines = [
+      {
+        product_id: product.id,
+        quantity: 1,
+        unit_price: Number(product.purchase_price) || 0,
+      },
+    ];
   }
 
   openModal(): void {
@@ -110,6 +149,10 @@ export class PurchaseListComponent implements OnInit {
   }
 
   closeModal(): void {
+    if (this.submitting()) {
+      return;
+    }
+
     this.showModal.set(false);
   }
 
@@ -140,7 +183,7 @@ export class PurchaseListComponent implements OnInit {
   }
 
   createPurchase(): void {
-    if (!this.canManagePurchases()) {
+    if (!this.canManagePurchases() || this.submitting()) {
       return;
     }
     if (!this.supplierId) {
@@ -170,14 +213,16 @@ export class PurchaseListComponent implements OnInit {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.toastService.error(
-          extractErrorMessage(err, "Erreur lors de la création de l'achat"),
-        );
+        this.toastService.error(extractErrorMessage(err, "Erreur lors de la création de l'achat"));
       },
     });
   }
 
   openDetails(purchase: Purchase): void {
+    if (this.loadingDetail()) {
+      return;
+    }
+
     this.selectedPurchase.set(purchase);
     this.loadingDetail.set(true);
 
@@ -228,31 +273,36 @@ export class PurchaseListComponent implements OnInit {
       },
       error: (err) => {
         this.cancelling.set(false);
-        this.toastService.error(
-          extractErrorMessage(err, "Impossible d'annuler cette commande."),
-        );
+        this.toastService.error(extractErrorMessage(err, "Impossible d'annuler cette commande."));
       },
     });
   }
 
   receivePurchase(purchase: Purchase): void {
-    if (purchase.status !== 'pending') {
+    if (
+      purchase.status !== 'pending' ||
+      !this.canManagePurchases() ||
+      this.receivingPurchaseId() !== null
+    ) {
       return;
     }
     if (!confirm('Confirmer la réception de cette commande ? Le stock sera mis à jour.')) {
       return;
     }
-    this.purchaseService.receivePurchase(purchase.id).subscribe({
-      next: () => {
-        this.toastService.success('Réception validée - Stock mis à jour');
-        this.loadPurchases();
-      },
-      error: (err) => {
-        this.toastService.error(
-          extractErrorMessage(err, 'Erreur lors de la réception.'),
-        );
-      },
-    });
+
+    this.receivingPurchaseId.set(purchase.id);
+    this.purchaseService
+      .receivePurchase(purchase.id)
+      .pipe(finalize(() => this.receivingPurchaseId.set(null)))
+      .subscribe({
+        next: () => {
+          this.toastService.success('Réception validée - Stock mis à jour');
+          this.loadPurchases();
+        },
+        error: (err) => {
+          this.toastService.error(extractErrorMessage(err, 'Erreur lors de la réception.'));
+        },
+      });
   }
 
   getStatusLabel(status: string): string {

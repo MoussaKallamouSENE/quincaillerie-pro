@@ -329,6 +329,37 @@ describe('SaleListComponent', () => {
     await settle();
   });
 
+  it('should reset the search and the status filter from the empty state', async () => {
+    await flushSales([]);
+
+    filterBy('credit');
+
+    httpMock
+      .expectOne(
+        (candidate) =>
+          candidate.url.endsWith('/api/sales') &&
+          candidate.params.get('payment_status') === 'credit',
+      )
+      .flush(buildPage([]));
+    await settle();
+
+    const reset = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((candidate) => candidate.textContent?.trim() === 'Réinitialiser les filtres');
+
+    expect(reset).toBeTruthy();
+    reset?.click();
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne(
+      (candidate) =>
+        candidate.url.endsWith('/api/sales') && !candidate.params.has('payment_status'),
+    );
+
+    request.flush(buildPage([]));
+    await settle();
+  });
+
   it('should send the search term to the API', async () => {
     await flushSales([buildSale()]);
 

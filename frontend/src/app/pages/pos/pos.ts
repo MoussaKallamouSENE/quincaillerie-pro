@@ -617,6 +617,10 @@ export class Pos {
 
   /** Ouvre la caisse avec le fond de caisse saisi. */
   protected onOpenSession(): void {
+    if (this.openingSubmitting()) {
+      return;
+    }
+
     if (this.openingForm.invalid) {
       this.openingForm.markAllAsTouched();
 
@@ -646,6 +650,10 @@ export class Pos {
 
   /** Ouvre la modale de cloture, initialisee sur le theorique du tiroir. */
   protected onOpenClosing(): void {
+    if (this.closingSubmitting() || this.closingModalOpen()) {
+      return;
+    }
+
     const session = this.cashSession();
 
     this.closingForm.reset({ closing_balance: session ? Number(session.expected_cash) : 0 });
@@ -662,6 +670,10 @@ export class Pos {
 
   /** Cloture la caisse avec le montant compte. */
   protected onCloseSession(): void {
+    if (this.closingSubmitting()) {
+      return;
+    }
+
     if (this.closingForm.invalid) {
       this.closingForm.markAllAsTouched();
 
@@ -727,6 +739,10 @@ export class Pos {
    * retire du tiroir, donc le solde theorique de la session est recharge.
    */
   protected onSaveExpense(): void {
+    if (this.expenseSubmitting()) {
+      return;
+    }
+
     if (this.expenseForm.invalid) {
       this.expenseForm.markAllAsTouched();
 

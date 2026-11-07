@@ -164,7 +164,7 @@
             (click)="clearSearch()"
             class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40"
           >
-            Réinitialiser la recherche
+            Réinitialiser les filtres
           </button>
         } @else {
           <p class="mt-4 text-sm font-medium text-slate-200">Aucune vente enregistrée</p>
@@ -281,7 +281,7 @@
             <button
               type="button"
               (click)="previousPage()"
-              [disabled]="!hasPreviousPage()"
+              [disabled]="!hasPreviousPage() || sales.isLoading()"
               class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Précédent
@@ -289,7 +289,7 @@
             <button
               type="button"
               (click)="nextPage()"
-              [disabled]="!hasNextPage()"
+              [disabled]="!hasNextPage() || sales.isLoading()"
               class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Suivant
@@ -522,9 +522,7 @@
         class="w-full max-w-md rounded-2xl border border-emerald-700 bg-[#153322] p-6 shadow-2xl"
         (click)="$event.stopPropagation()"
       >
-        <h2 id="sale-payment-title" class="text-xl font-bold text-white">
-          Encaisser un règlement
-        </h2>
+        <h2 id="sale-payment-title" class="text-xl font-bold text-white">Encaisser un règlement</h2>
         <p class="mt-1 text-sm text-slate-400">
           Vente {{ sale.reference }} · reste dû :
           <span class="font-semibold text-red-300">

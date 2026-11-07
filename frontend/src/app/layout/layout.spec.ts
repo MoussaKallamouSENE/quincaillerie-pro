@@ -59,6 +59,13 @@ describe('Layout', () => {
     expect(links.some((link) => link.getAttribute('href') === '/products')).toBe(true);
   });
 
+  it('should not render placeholder search or notification controls', () => {
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('input[type="search"]')).toBeNull();
+    expect(element.querySelector('[aria-label^="Notifications"]')).toBeNull();
+  });
+
   it('should name the products entry in the navigation', () => {
     const element = fixture.nativeElement as HTMLElement;
     const link = Array.from(element.querySelectorAll('a[href]')).find(
@@ -68,12 +75,30 @@ describe('Layout', () => {
     expect(link?.textContent).toContain('Produits');
   });
 
-  it('should disable the modules that are not available yet', () => {
-    const element = fixture.nativeElement as HTMLElement;
-    const disabled = Array.from(element.querySelectorAll('button[aria-disabled="true"]'));
+  it('should show the reports entry to an admin and a manager', () => {
+    const reportsLink = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a[href]')).find(
+        (link) => link.getAttribute('href') === '/reports',
+      );
 
-    expect(disabled.length).toBeGreaterThan(0);
-    expect(element.textContent).toContain('Rapports');
+    roles.set(['Admin']);
+    fixture.detectChanges();
+    expect(reportsLink()).toBeDefined();
+
+    roles.set(['Gérant']);
+    fixture.detectChanges();
+    expect(reportsLink()).toBeDefined();
+  });
+
+  it('should hide the reports entry from an employee', () => {
+    roles.set(['Employé']);
+    fixture.detectChanges();
+
+    const reportsLink = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('a[href]'),
+    ).find((link) => link.getAttribute('href') === '/reports');
+
+    expect(reportsLink).toBeUndefined();
   });
 
   it('should hide the users entry from an employee', () => {

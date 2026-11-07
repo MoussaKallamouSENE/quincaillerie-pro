@@ -7,12 +7,14 @@ use App\Http\Requests\StoreSalePaymentRequest;
 use App\Http\Requests\StoreSaleRequest;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
+use App\Models\Setting;
 use App\Services\SaleService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class SaleController extends Controller
@@ -94,7 +96,15 @@ class SaleController extends Controller
             'Vous ne pouvez pas consulter la facture de cette vente.',
         );
 
-        return Pdf::loadView('pdf.invoice', ['sale' => $model])
+        $company = Setting::query()->where('key', 'company.profile')->first()?->value ?? [];
+        $company = is_array($company) ? $company : [];
+        $logoPath = $company['logo_path'] ?? null;
+        $logoDataUri = null;
+        if (is_string($logoPath) && str_starts_with($logoPath, 'company-logos/') && Storage::disk('local')->exists($logoPath)) {
+            $logoDataUri = 'data:'.Storage::disk('local')->mimeType($logoPath).';base64,'.base64_encode(Storage::disk('local')->get($logoPath));
+        }
+
+        return Pdf::loadView('pdf.invoice', ['sale' => $model, 'company' => $company, 'logoDataUri' => $logoDataUri])
             ->setPaper('a4', 'portrait')
             ->download('facture-'.$model->reference.'.pdf');
     }

@@ -270,7 +270,7 @@ export class UserList {
   protected onConfirmDelete(): void {
     const user = this.userToDelete();
 
-    if (!user) {
+    if (!user || this.deleting()) {
       return;
     }
 
@@ -345,6 +345,10 @@ export class UserList {
    * renvoye par l'API est affiche dans la modale.
    */
   protected onSubmit(): void {
+    if (this.submitting()) {
+      return;
+    }
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.formError.set('Veuillez corriger les champs en surbrillance.');

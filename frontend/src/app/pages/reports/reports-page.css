@@ -1,0 +1,65 @@
+:host {
+  display: block;
+  min-height: 100%;
+}
+
+input[type='date'] {
+  color-scheme: dark;
+}
+
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.report-card {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  :host {
+    background: #fff;
+    color: #0f172a;
+  }
+
+  .report-card {
+    background: #fff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  .report-card,
+  .report-card * {
+    color: #0f172a !important;
+  }
+
+  .report-card svg text {
+    fill: #475569 !important;
+  }
+
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  table {
+    width: 100%;
+    min-width: 0 !important;
+    font-size: 10px;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  svg {
+    break-inside: avoid;
+  }
+}

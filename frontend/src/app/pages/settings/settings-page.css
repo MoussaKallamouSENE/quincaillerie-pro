@@ -1,0 +1,14 @@
+:host {
+  display: block;
+}
+
+input[aria-invalid='true'],
+textarea[aria-invalid='true'] {
+  border-color: #ef4444;
+}
+
+input[aria-invalid='true']:focus,
+textarea[aria-invalid='true']:focus {
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 15%);
+}

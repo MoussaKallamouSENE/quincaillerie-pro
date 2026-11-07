@@ -123,6 +123,9 @@ export class Dashboard {
   /** Vrai si le chiffre d'affaires et le graphique doivent etre affiches. */
   protected readonly canViewRevenue = computed(() => !this.isEmployee());
 
+  /** Vrai si l'utilisateur peut acceder aux rapports et aux achats. */
+  protected readonly canManageOperations = computed(() => this.auth.hasRole('Admin', 'Gérant'));
+
   /** Nombre de references du catalogue, `null` tant que la reponse n'est pas arrivee. */
   protected readonly catalogTotal = computed<number | null>(() => {
     const page = this.catalog.hasValue() ? this.catalog.value() : undefined;

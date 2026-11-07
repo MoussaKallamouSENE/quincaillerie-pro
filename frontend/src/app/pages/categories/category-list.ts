@@ -39,6 +39,7 @@ export class CategoryListComponent {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly editingId = signal<number | null>(null);
+  protected readonly deletingId = signal<number | null>(null);
 
   /** Donnees du formulaire de creation/modification. */
   protected form: {
@@ -169,9 +170,10 @@ export class CategoryListComponent {
     this.submitting.set(true);
     this.formError.set(null);
 
-    const request$ = id === null
-      ? this.referenceService.createCategory(draft)
-      : this.referenceService.updateCategory(id, draft);
+    const request$ =
+      id === null
+        ? this.referenceService.createCategory(draft)
+        : this.referenceService.updateCategory(id, draft);
 
     request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
@@ -186,32 +188,33 @@ export class CategoryListComponent {
       },
       error: (error: unknown) => {
         this.submitting.set(false);
-        this.formError.set(
-          extractErrorMessage(error, 'Impossible d’enregistrer la catégorie.'),
-        );
+        this.formError.set(extractErrorMessage(error, 'Impossible d’enregistrer la catégorie.'));
       },
     });
   }
 
   /** Supprime une categorie apres confirmation. */
   protected remove(category: CatalogCategory): void {
-    if (
-      !confirm(
-        `Supprimer la catégorie « ${category.name} » ? Cette action est définitive.`,
-      )
-    ) {
+    if (this.deletingId() !== null) {
       return;
     }
 
+    if (!confirm(`Supprimer la catégorie « ${category.name} » ? Cette action est définitive.`)) {
+      return;
+    }
+
+    this.deletingId.set(category.id);
     this.referenceService
       .deleteCategory(category.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.deletingId.set(null);
           this.toastService.success(`Catégorie « ${category.name} » supprimée.`);
           this.load();
         },
         error: (error: unknown) => {
+          this.deletingId.set(null);
           this.toastService.error(
             extractErrorMessage(error, 'Impossible de supprimer la catégorie.'),
           );

@@ -16,3 +16,4 @@ QuincailleriePro-restore-*/
 /scripts/
 backend/database/seeders/*.bak
 .cursor/
+.aider*

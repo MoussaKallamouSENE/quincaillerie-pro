@@ -230,6 +230,7 @@ describe('Dashboard', () => {
   });
 
   it('should list the stock alerts returned by the API', async () => {
+    roles.set(['Admin']);
     render();
     await flushData({
       catalog: buildPage([], 14),
@@ -250,15 +251,47 @@ describe('Dashboard', () => {
     });
 
     const element = fixture.nativeElement as HTMLElement;
-    const buttons = Array.from(element.querySelectorAll('button')).filter((button) =>
-      button.textContent?.trim().startsWith('Commander'),
+    const links = Array.from(element.querySelectorAll('a')).filter((link) =>
+      link.textContent?.trim().startsWith('Commander'),
     );
 
-    expect(buttons).toHaveLength(2);
+    expect(links).toHaveLength(2);
+    expect(links[0].getAttribute('href')).toBe('/purchases?product=1');
+    expect(links[1].getAttribute('href')).toBe('/purchases?product=2');
     expect(element.textContent).toContain('Perceuse à percussion 800W');
     expect(element.textContent).toContain('PRD-0004');
     expect(element.textContent).toContain('4 restants');
     expect(element.textContent).toContain('Seuil : 10 pièce');
+  });
+
+  it('should hide purchase actions from an employee', async () => {
+    roles.set(['Employé']);
+    render();
+    await flushData({
+      catalog: buildPage([], 14),
+      lowStock: buildPage([buildProduct()], 1),
+    });
+
+    const element = fixture.nativeElement as HTMLElement;
+    const commands = Array.from(element.querySelectorAll('a')).filter((link) =>
+      link.textContent?.trim().startsWith('Commander'),
+    );
+
+    expect(commands).toHaveLength(0);
+    expect(element.textContent).toContain('Perceuse à percussion 800W');
+  });
+
+  it('should link to reports for a manager', async () => {
+    roles.set(['Gérant']);
+    render();
+    await flushData();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const reportsLink = Array.from(element.querySelectorAll('a')).find(
+      (link) => link.getAttribute('href') === '/reports',
+    );
+
+    expect(reportsLink?.textContent).toContain('Rapports');
   });
 
   it('should show the catalogue size and the number of alerts', async () => {

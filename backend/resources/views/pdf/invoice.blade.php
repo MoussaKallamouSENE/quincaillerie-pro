@@ -274,7 +274,13 @@
         <table>
             <tr>
                 <td class="header-shop">
-                    <p class="shop-name">{{ config('quincaillerie.name') }}</p>
+                    @if (!empty($logoDataUri))
+                        <img src="{{ $logoDataUri }}" alt="Logo" style="max-height: 48px; max-width: 130px; margin-bottom: 6px;">
+                    @endif
+                    <p class="shop-name">{{ $company['business_name'] ?? config('quincaillerie.name') }}</p>
+                    @if (!empty($company['address'])) <p class="meta-sub">{{ $company['address'] }}</p> @endif
+                    @if (!empty($company['phone'])) <p class="meta-sub">{{ $company['phone'] }}</p> @endif
+                    @if (!empty($company['email'])) <p class="meta-sub">{{ $company['email'] }}</p> @endif
                 </td>
                 <td class="header-doc">
                     <p class="doc-title">Facture</p>
@@ -390,7 +396,7 @@
     <footer class="footer">
         <table>
             <tr>
-                <td>Merci de votre confiance.</td>
+                <td>{{ $company['invoice_footer'] ?? 'Merci de votre confiance.' }}</td>
                 <td class="footer-right">
                     Document généré le {{ now()->format('d/m/Y à H:i') }}
                 </td>

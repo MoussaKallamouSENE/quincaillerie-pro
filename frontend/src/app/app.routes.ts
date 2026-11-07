@@ -80,6 +80,17 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/users/user-list').then((m) => m.UserList),
         title: 'Utilisateurs - Quincaillerie Pro',
       },
+      {
+        path: 'reports',
+        canActivate: [roleGuard('Admin', 'Gérant')],
+        loadComponent: () => import('./pages/reports/reports-page').then((m) => m.ReportsPage),
+        title: 'Rapports - Quincaillerie Pro',
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./pages/settings/settings-page').then((m) => m.SettingsPage),
+        title: 'Paramètres - Quincaillerie Pro',
+      },
     ],
   },
   { path: '**', redirectTo: '' },

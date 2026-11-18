@@ -15,6 +15,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -83,9 +85,10 @@ class UserController extends Controller
     {
         $this->assertCanManageUsers();
 
-        $user = DB::transaction(function () use ($request): User {
-            $data = $request->validated();
+        $data = $request->validated();
+        $role = $this->roleForAssignment($data['role'], $request->user());
 
+        $user = DB::transaction(function () use ($data, $role): User {
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -94,7 +97,7 @@ class UserController extends Controller
                 'is_active' => $data['is_active'] ?? true,
             ]);
 
-            $user->assignRole($data['role']);
+            $user->assignRole($role);
 
             return $user;
         });
@@ -124,9 +127,10 @@ class UserController extends Controller
     {
         $this->assertCanManageUsers();
 
-        DB::transaction(function () use ($request, $user): void {
-            $data = $request->validated();
+        $data = $request->validated();
+        $role = isset($data['role']) ? $this->roleForAssignment($data['role'], $request->user(), $user) : null;
 
+        DB::transaction(function () use ($data, $role, $user): void {
             $user->fill(Arr::only($data, ['name', 'email', 'phone', 'is_active']));
 
             if (! empty($data['password'])) {
@@ -140,8 +144,8 @@ class UserController extends Controller
                 $user->tokens()->delete();
             }
 
-            if (! empty($data['role'])) {
-                $user->syncRoles([$data['role']]);
+            if ($role !== null) {
+                $user->syncRoles([$role]);
             }
         });
 
@@ -184,6 +188,29 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Utilisateur supprimé.',
         ]);
+    }
+
+    /**
+     * Autorise le rôle qui sera réellement attribué, indépendamment de la
+     * collation utilisée pour retrouver son nom en base.
+     */
+    private function roleForAssignment(string $name, User $actor, ?User $target = null): Role
+    {
+        $role = Role::query()->where('guard_name', 'web')->where('name', $name)->first();
+
+        if ($role === null) {
+            throw ValidationException::withMessages(['role' => 'Le rôle sélectionné n’existe pas.']);
+        }
+
+        if ($role->name === 'Admin' && ! $actor->hasRole('Admin')) {
+            throw new AuthorizationException('Seul un administrateur peut attribuer le rôle Admin.');
+        }
+
+        if ($target?->is($actor) && $role->name !== $target->getRoleNames()->first()) {
+            throw new AuthorizationException('Vous ne pouvez pas modifier votre propre rôle.');
+        }
+
+        return $role;
     }
 
     /**

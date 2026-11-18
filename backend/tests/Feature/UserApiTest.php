@@ -173,6 +173,18 @@ class UserApiTest extends TestCase
             ->assertJsonValidationErrors(['name', 'email', 'password', 'role']);
     }
 
+    public function test_a_role_for_another_guard_cannot_be_assigned(): void
+    {
+        $this->authenticateAs('Admin');
+        $role = Role::create(['name' => 'Autre rôle', 'guard_name' => 'api']);
+
+        $this->postJson('/api/users', $this->payload(['role' => $role->name]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'awa.diop@quincaillerie.com']);
+    }
+
     public function test_a_user_can_be_updated(): void
     {
         $user = User::factory()->create([
@@ -273,6 +285,22 @@ class UserApiTest extends TestCase
         ]))->assertForbidden();
 
         $this->assertDatabaseMissing('users', ['email' => 'admin.cree@quincaillerie.com']);
+    }
+
+    public function test_a_manager_cannot_assign_the_admin_role_to_an_existing_user(): void
+    {
+        $this->authenticateAs('Gérant');
+        $employee = User::factory()->create(['name' => 'Nom original']);
+        $employee->assignRole($this->role('Employé'));
+
+        $this->putJson("/api/users/{$employee->id}", [
+            'name' => 'Autre nom',
+            'role' => 'Admin',
+        ])->assertForbidden();
+
+        $employee->refresh();
+        $this->assertSame('Nom original', $employee->name);
+        $this->assertSame(['Employé'], $employee->getRoleNames()->all());
     }
 
     public function test_an_admin_can_create_an_admin(): void

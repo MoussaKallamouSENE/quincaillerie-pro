@@ -44,16 +44,24 @@ class CashSession extends Model
     /**
      * Montant en espèces encaissé pendant la session.
      *
-     * Seuls les paiements réglés en espèces alimentent le fond de caisse :
-     * les paiements par Wave, Orange Money, virement ou chèque en sont
-     * exclus, car ils n'entrent pas dans le tiroir.
+     * Un paiement en espèces appartient à la caisse qui l'encaisse, même
+     * pour une vente enregistrée dans une autre session. Les paiements
+     * historiques sans session explicite restent rattachés via leur vente.
      */
     public function cashReceived(): float
     {
-        return (float) $this->sales()
+        $recorded = Payment::query()
+            ->where('cash_session_id', $this->id)
+            ->where('method', 'cash')
+            ->sum('amount');
+
+        $legacy = $this->sales()
             ->join('payments', 'payments.sale_id', '=', 'sales.id')
+            ->whereNull('payments.cash_session_id')
             ->where('payments.method', 'cash')
             ->sum('payments.amount');
+
+        return (float) $recorded + (float) $legacy;
     }
 
     /**
@@ -67,7 +75,7 @@ class CashSession extends Model
     }
 
     /**
-     * Solde théorique du tiroir : fond de caisse + ventes en espèces - dépenses.
+     * Solde théorique du tiroir : fonds de caisse + encaissements en espèces - dépenses.
      *
      * Une session close conserve le solde fige au moment de sa clôture : le
      * theorique d'une session cloturee ne bouge plus, meme si une dépense est

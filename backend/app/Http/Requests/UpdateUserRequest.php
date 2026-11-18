@@ -8,6 +8,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -15,9 +16,8 @@ class UpdateUserRequest extends FormRequest
      * Determine if the user is authorized to make this request.
      *
      * Seuls les comptes autorises a gerer les utilisateurs peuvent en modifier.
-     * Un compte non administrateur ne peut ni modifier un administrateur, ni
-     * attribuer le role Admin. Personne ne peut changer son propre role ni
-     * desactiver son propre compte par cet endpoint.
+     * Un compte non administrateur ne peut pas modifier un administrateur.
+     * Personne ne peut desactiver son propre compte par cet endpoint.
      */
     public function authorize(): bool
     {
@@ -32,20 +32,8 @@ class UpdateUserRequest extends FormRequest
             return false;
         }
 
-        if ($this->input('role') === 'Admin' && ! $actor->hasRole('Admin')) {
+        if ($target->is($actor) && $this->has('is_active') && ! $this->boolean('is_active') && $target->is_active) {
             return false;
-        }
-
-        if ($target->is($actor)) {
-            $currentRole = $target->getRoleNames()->first();
-
-            if ($this->filled('role') && $this->input('role') !== $currentRole) {
-                return false;
-            }
-
-            if ($this->has('is_active') && ! $this->boolean('is_active') && $target->is_active) {
-                return false;
-            }
         }
 
         return true;
@@ -71,7 +59,7 @@ class UpdateUserRequest extends FormRequest
             ],
             'phone' => ['sometimes', 'nullable', 'string', 'max:255'],
             'password' => ['sometimes', 'nullable', 'string', 'min:8'],
-            'role' => ['sometimes', 'string', 'exists:roles,name'],
+            'role' => ['sometimes', 'string', Rule::exists(Role::class, 'name')->where('guard_name', 'web')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

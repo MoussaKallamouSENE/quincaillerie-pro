@@ -83,7 +83,7 @@ class SaleService
                 }
 
                 if ($paid > 0) {
-                    $this->recordPayment($sale, $paid, $data['payment'] ?? [], $user);
+                    $this->recordPayment($sale, $paid, $data['payment'] ?? [], $user, $cashSession);
                 }
 
                 // Le reliquat de la vente est reporte sur la dette du client.
@@ -143,15 +143,22 @@ class SaleService
      * La vente est verrouillée pendant l'opération : deux encaissements
      * concurrents ne peuvent pas dépasser ensemble le reste à payer. La dette
      * du client est diminuée du montant encaissé et le statut de la vente est
-     * recalculé à partir des paiements réellement enregistrés.
+     * recalculé à partir des paiements réellement enregistrés. Pour un
+     * versement en espèces, verrouiller la caisse de l’encaisseur avant
+     * d'encaisser évite qu'elle ne soit clôturée pendant l'opération.
      *
      * @param  array<string, mixed>  $data
      *
+     * @throws NoOpenCashSessionException Pour un règlement en espèces sans caisse ouverte.
      * @throws ValidationException
      */
     public function addPayment(Sale $sale, array $data, User $user): Sale
     {
         return DB::transaction(function () use ($sale, $data, $user): Sale {
+            $cashSession = $data['method'] === 'cash'
+                ? $this->openCashSessionFor($user, 'Ouvrez une session de caisse avant d’encaisser un règlement en espèces.')
+                : null;
+
             $lockedSale = Sale::query()
                 ->lockForUpdate()
                 ->findOrFail($sale->id);
@@ -182,13 +189,7 @@ class SaleService
                 ]);
             }
 
-            Payment::create([
-                'sale_id' => $lockedSale->id,
-                'user_id' => $user->id,
-                'amount' => $amount,
-                'method' => $data['method'],
-                'reference' => $data['reference'] ?? null,
-            ]);
+            $this->recordPayment($lockedSale, $amount, $data, $user, $cashSession);
 
             if ($lockedSale->customer_id !== null) {
                 $customer = Customer::query()
@@ -219,7 +220,7 @@ class SaleService
      *
      * @throws NoOpenCashSessionException
      */
-    private function openCashSessionFor(User $user): CashSession
+    private function openCashSessionFor(User $user, ?string $noOpenSessionMessage = null): CashSession
     {
         $cashSession = CashSession::query()
             ->where('user_id', $user->id)
@@ -228,7 +229,9 @@ class SaleService
             ->first();
 
         if (! $cashSession instanceof CashSession) {
-            throw new NoOpenCashSessionException;
+            throw $noOpenSessionMessage === null
+                ? new NoOpenCashSessionException
+                : new NoOpenCashSessionException($noOpenSessionMessage);
         }
 
         return $cashSession;
@@ -519,13 +522,16 @@ class SaleService
      *
      * @param  array<string, mixed>  $payment
      */
-    private function recordPayment(Sale $sale, float $paid, array $payment, User $user): void
+    private function recordPayment(Sale $sale, float $paid, array $payment, User $user, ?CashSession $cashSession): void
     {
+        $method = $payment['method'] ?? 'cash';
+
         Payment::create([
             'sale_id' => $sale->id,
             'user_id' => $user->id,
+            'cash_session_id' => $method === 'cash' ? $cashSession?->id : null,
             'amount' => $paid,
-            'method' => $payment['method'] ?? 'cash',
+            'method' => $method,
             'reference' => $payment['reference'] ?? null,
         ]);
     }

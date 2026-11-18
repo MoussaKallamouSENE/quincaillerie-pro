@@ -63,7 +63,7 @@ class CashSessionController extends Controller
      *
      * The counted amount is stored on the session, its status becomes "closed"
      * and its closing time is recorded. The theoretical cash of the drawer
-     * (opening balance + cash sales - expenses) is frozen at this exact
+     * (opening balance + cash receipts - expenses) is frozen at this exact
      * moment, so a later expense cannot rewrite the history of the session.
      * The resource exposes the difference between the counted cash and that
      * theoretical cash.
@@ -88,7 +88,7 @@ class CashSessionController extends Controller
             }
 
             // Theoretical balance of the drawer, frozen at closing time:
-            // opening balance + cash sales - expenses.
+            // opening balance + cash receipts - expenses.
             // The balance is written on the session, so an expense recorded
             // later cannot rewrite the history of the closed session.
             $cashSession->expected_cash = $cashSession->computeExpectedCash();

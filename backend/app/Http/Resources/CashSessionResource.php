@@ -28,7 +28,7 @@ class CashSessionResource extends JsonResource
             'status' => $this->status,
             'opened_at' => $this->opened_at?->toIso8601String(),
             'closed_at' => $this->closed_at?->toIso8601String(),
-            // Ventes encaisseees en especes pendant la session.
+            // Encaissements en espèces pendant la session.
             'cash_received' => $this->money($this->cashReceived()),
             // Depenses payees en especes pendant la session.
             'expenses_total' => $this->money($this->expensesPaid()),

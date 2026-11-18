@@ -129,6 +129,7 @@ class SaleApiTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'sale_id' => $response->json('data.id'),
             'user_id' => $user->id,
+            'cash_session_id' => $cashSession->id,
             'amount' => 2000,
             'method' => 'cash',
         ]);
@@ -816,7 +817,7 @@ class SaleApiTest extends TestCase
     public function test_a_credit_sale_can_be_settled_in_several_payments(): void
     {
         $user = $this->authenticate();
-        $this->openCashSession($user);
+        $cashSession = $this->openCashSession($user);
 
         $customer = Customer::factory()->create([
             'credit_limit' => 10000,
@@ -849,9 +850,12 @@ class SaleApiTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'sale_id' => $saleId,
             'user_id' => $user->id,
+            'cash_session_id' => $cashSession->id,
             'amount' => 2000,
             'method' => 'cash',
         ]);
+
+        $this->postJson('/api/cash-sessions/close', ['closing_balance' => 2000])->assertOk();
 
         $this->postJson("/api/sales/{$saleId}/payments", [
             'amount' => 1000,
@@ -867,7 +871,78 @@ class SaleApiTest extends TestCase
             'id' => $customer->id,
             'outstanding_balance' => 0,
         ]);
+        $this->assertDatabaseHas('payments', [
+            'sale_id' => $saleId,
+            'cash_session_id' => null,
+            'amount' => 1000,
+            'method' => 'wave',
+        ]);
         $this->assertSame(2, Sale::findOrFail($saleId)->payments()->count());
+    }
+
+    public function test_a_cash_repayment_is_counted_only_in_the_cashiers_drawer(): void
+    {
+        $seller = $this->authenticate('Employé');
+        $originalSession = $this->openCashSession($seller);
+        $customer = Customer::factory()->create();
+        $product = $this->product();
+
+        $saleId = $this->postJson('/api/sales', $this->payload($product, 1, [
+            'customer_id' => $customer->id,
+            'payment' => null,
+        ]))->assertCreated()->json('data.id');
+
+        $this->postJson('/api/cash-sessions/close', ['closing_balance' => 0])
+            ->assertOk()
+            ->assertJsonPath('data.expected_cash', '0.00');
+
+        $cashier = $this->authenticate('Gérant');
+        $receivingSession = $this->openCashSession($cashier);
+
+        $this->postJson("/api/sales/{$saleId}/payments", [
+            'amount' => 1000,
+            'method' => 'cash',
+            'cash_session_id' => $originalSession->id,
+        ])->assertCreated()->assertJsonPath('data.payment_status', 'paid');
+
+        $this->assertDatabaseHas('payments', [
+            'sale_id' => $saleId,
+            'user_id' => $cashier->id,
+            'cash_session_id' => $receivingSession->id,
+            'amount' => 1000,
+        ]);
+        $this->assertSame(0.0, $originalSession->refresh()->cashReceived());
+        $this->assertSame(0.0, $originalSession->expectedCash());
+
+        $this->postJson('/api/cash-sessions/close', ['closing_balance' => 1000])
+            ->assertOk()
+            ->assertJsonPath('data.id', $receivingSession->id)
+            ->assertJsonPath('data.cash_received', '1000.00')
+            ->assertJsonPath('data.expected_cash', '1000.00')
+            ->assertJsonPath('data.difference', '0.00');
+    }
+
+    public function test_a_cash_repayment_requires_the_cashiers_own_open_drawer(): void
+    {
+        $this->authenticate('Gérant');
+        $originalSession = CashSession::factory()->create();
+        $customer = Customer::factory()->create(['outstanding_balance' => 1000]);
+        $sale = Sale::factory()->credit()->create([
+            'user_id' => $originalSession->user_id,
+            'cash_session_id' => $originalSession->id,
+            'customer_id' => $customer->id,
+            'total_amount' => 1000,
+        ]);
+
+        $this->postJson("/api/sales/{$sale->id}/payments", [
+            'amount' => 1000,
+            'method' => 'cash',
+        ])->assertConflict()
+            ->assertJsonPath('message', 'Ouvrez une session de caisse avant d’encaisser un règlement en espèces.');
+
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertSame('credit', $sale->refresh()->payment_status);
+        $this->assertSame('1000.00', $customer->refresh()->outstanding_balance);
     }
 
     public function test_a_payment_cannot_exceed_the_remaining_balance(): void

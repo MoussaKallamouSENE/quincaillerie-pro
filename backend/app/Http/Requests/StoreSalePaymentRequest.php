@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Payment;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSalePaymentRequest extends FormRequest
 {
@@ -26,7 +28,13 @@ class StoreSalePaymentRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['required', 'string', 'in:cash,wave,orange_money,bank_transfer,check'],
-            'reference' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'reference' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn (): bool => Payment::requiresManualVerification((string) $this->input('method'))),
+            ],
+            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:64'],
         ];
     }
 
@@ -43,6 +51,8 @@ class StoreSalePaymentRequest extends FormRequest
             'amount.gt' => 'Le montant du règlement doit être supérieur à zéro.',
             'method.required' => 'Le mode de paiement est obligatoire.',
             'method.in' => 'Le mode de paiement est invalide.',
+            'reference.required' => 'La référence de transaction est obligatoire pour Wave et Orange Money.',
+            'reference.string' => 'La référence de transaction doit être une chaîne de caractères.',
         ];
     }
 
@@ -57,6 +67,7 @@ class StoreSalePaymentRequest extends FormRequest
             'amount' => 'montant',
             'method' => 'mode de paiement',
             'reference' => 'référence',
+            'idempotency_key' => 'clé d’idempotence',
         ];
     }
 }

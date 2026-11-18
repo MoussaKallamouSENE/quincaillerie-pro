@@ -9,6 +9,282 @@
     </div>
   </div>
 
+  <!-- File de verification des paiements manuels -->
+  <section
+    class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
+  >
+    <header
+      class="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/40 px-6 py-4"
+    >
+      <div>
+        <h2 class="text-base font-semibold text-emerald-200">Vérification des paiements manuels</h2>
+        <p class="mt-1 text-xs text-slate-400">
+          Consultez, confirmez ou rejetez les paiements Wave et Orange Money avant de les compter
+          comme encaissés.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        @let pendingTotal = manualPendingTotal();
+        @if (pendingTotal !== null && pendingTotal > 0) {
+          <span
+            class="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/25"
+            title="Total global des paiements manuels en attente"
+          >
+            Total en attente : {{ pendingTotal }}
+          </span>
+        }
+        <button
+          type="button"
+          (click)="reloadManualPayments()"
+          [disabled]="manualPayments.isLoading()"
+          class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Actualiser
+        </button>
+      </div>
+    </header>
+
+    <!-- Filtres de la file -->
+    <div class="border-b border-emerald-800/40 px-6 py-4">
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <div class="relative">
+          <svg
+            class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+            />
+          </svg>
+          <input
+            id="manual-payment-search"
+            type="search"
+            maxlength="255"
+            placeholder="Rechercher une référence de transaction…"
+            aria-label="Rechercher un paiement manuel par référence"
+            [value]="manualSearchTerm()"
+            (input)="onManualSearch($event)"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 py-2 pr-3 pl-10 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label for="manual-payment-status" class="sr-only">
+            Filtrer par statut de vérification
+          </label>
+          <select
+            id="manual-payment-status"
+            [value]="manualStatusFilter()"
+            (change)="onManualStatusFilter($event)"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          >
+            <option value="pending">À vérifier</option>
+            <option value="confirmed">Confirmés</option>
+            <option value="rejected">Rejetés</option>
+            <option value="all">Tous les statuts</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="manual-payment-method" class="sr-only"> Filtrer par moyen de paiement </label>
+          <select
+            id="manual-payment-method"
+            [value]="manualMethodFilter()"
+            (change)="onManualMethodFilter($event)"
+            class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+          >
+            <option value="">Tous les moyens</option>
+            <option value="wave">Wave</option>
+            <option value="orange_money">Orange Money</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    @if (manualPayments.isLoading()) {
+      <p class="px-6 py-5 text-sm text-slate-400" role="status">
+        Chargement des paiements manuels…
+      </p>
+    } @else if (manualPaymentsError()) {
+      <p class="px-6 py-5 text-sm text-red-300" role="alert">
+        {{ manualPaymentsError() }}
+      </p>
+    } @else if (manualPaymentsEmpty()) {
+      <div class="px-6 py-8 text-center">
+        @if (manualHasFilter()) {
+          <p class="text-sm font-medium text-slate-200">
+            Aucun paiement ne correspond à ces filtres
+          </p>
+          <p class="mt-1 text-xs text-slate-400">
+            Essayez une autre référence, un autre statut ou un autre moyen de paiement.
+          </p>
+          <button
+            type="button"
+            (click)="clearManualFilters()"
+            class="mt-4 rounded-lg border border-emerald-800/60 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-900/40"
+          >
+            Réinitialiser les filtres
+          </button>
+        } @else {
+          <p class="text-sm font-medium text-slate-200">
+            Aucun paiement en attente de vérification
+          </p>
+          <p class="mt-1 text-xs text-slate-400">
+            Les paiements Wave et Orange Money à contrôler apparaîtront ici.
+          </p>
+        }
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table data-testid="manual-payments-table" class="w-full min-w-[1000px] text-left text-sm">
+          <caption class="sr-only">
+            Paiements manuels Wave et Orange Money
+          </caption>
+          <thead>
+            <tr
+              class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
+            >
+              <th scope="col" class="px-6 py-3 font-medium">Vente</th>
+              <th scope="col" class="px-6 py-3 font-medium">Date</th>
+              <th scope="col" class="px-6 py-3 font-medium">Mode / référence</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Montant</th>
+              <th scope="col" class="px-6 py-3 font-medium">Statut</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">
+                <span class="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-emerald-800/30">
+            @for (payment of manualPaymentRows(); track payment.id) {
+              <tr class="transition hover:bg-emerald-900/30">
+                <td class="px-6 py-4">
+                  <p class="font-medium text-slate-100">{{ payment.sale_reference ?? '—' }}</p>
+                  <p class="mt-0.5 text-xs text-slate-400">
+                    {{ payment.customer_name ?? 'Client de passage' }} ·
+                    {{ payment.seller_name ?? '—' }}
+                  </p>
+                </td>
+                <td class="px-6 py-4 text-slate-400">
+                  {{ payment.created_at | date: 'dd/MM/yyyy HH:mm' }}
+                </td>
+                <td class="px-6 py-4">
+                  <p class="text-slate-200">{{ paymentLabel(payment.method) }}</p>
+                  <p class="mt-0.5 font-mono text-xs text-emerald-200">
+                    {{ payment.reference ?? '—' }}
+                  </p>
+                </td>
+                <td class="px-6 py-4 text-right font-semibold text-slate-100">
+                  {{ payment.amount | number: '1.2-2' }}
+                  <span class="text-xs font-normal text-slate-500">FCFA</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
+                    [class]="verificationClasses(payment.status)"
+                  >
+                    {{ verificationLabel(payment.status) }}
+                  </span>
+
+                  @if (payment.status === 'confirmed' && payment.confirmed_at) {
+                    <p class="mt-1 text-[11px] text-slate-400">
+                      Par {{ payment.confirmed_by_name ?? '—' }} le
+                      {{ payment.confirmed_at | date: 'dd/MM/yyyy HH:mm' }}
+                    </p>
+                  } @else if (payment.status === 'rejected' && payment.rejected_at) {
+                    <p class="mt-1 text-[11px] text-slate-400">
+                      Par {{ payment.rejected_by_name ?? '—' }} le
+                      {{ payment.rejected_at | date: 'dd/MM/yyyy HH:mm' }}
+                    </p>
+                    @if (payment.rejection_reason) {
+                      <p class="mt-1 max-w-xs text-xs text-red-300">
+                        {{ payment.rejection_reason }}
+                      </p>
+                    }
+                  }
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      (click)="openManualDetails(payment)"
+                      class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40"
+                    >
+                      Détails
+                    </button>
+                    @if (payment.status === 'pending') {
+                      <button
+                        type="button"
+                        (click)="openReview(payment, 'confirm')"
+                        class="rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
+                      >
+                        Confirmer
+                      </button>
+                      <button
+                        type="button"
+                        (click)="openReview(payment, 'reject')"
+                        class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/15"
+                      >
+                        Rejeter
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <footer
+        data-testid="manual-payments-pagination"
+        class="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-800/40 px-6 py-3"
+      >
+        @let filteredTotal = manualFilteredTotal();
+        <p class="text-xs text-slate-400">
+          @if (filteredTotal !== null) {
+            {{ filteredTotal }} résultat{{ filteredTotal > 1 ? 's' : '' }}
+          } @else {
+            {{ manualDisplayedCount() }} affiché{{ manualDisplayedCount() > 1 ? 's' : '' }}
+          }
+        </p>
+
+        @if (manualTotalPages() > 1) {
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-xs text-slate-400">
+              Page {{ manualMeta()?.current_page ?? 1 }} sur {{ manualTotalPages() }}
+            </p>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                (click)="previousManualPage()"
+                [disabled]="!manualHasPreviousPage() || manualPayments.isLoading()"
+                class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Précédent
+              </button>
+              <button
+                type="button"
+                (click)="nextManualPage()"
+                [disabled]="!manualHasNextPage() || manualPayments.isLoading()"
+                class="rounded-lg border border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Suivant
+              </button>
+            </div>
+          </div>
+        }
+      </footer>
+    }
+  </section>
+
   <!-- Historique -->
   <section
     class="mt-6 overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30"
@@ -33,6 +309,7 @@
           />
         </svg>
         <input
+          id="sales-search"
           type="search"
           placeholder="Rechercher une référence ou un client…"
           aria-label="Rechercher une vente par référence ou par client"
@@ -174,7 +451,7 @@
     } @else {
       <!-- Tableau -->
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[1000px] text-left text-sm">
+        <table data-testid="sales-history-table" class="w-full min-w-[1000px] text-left text-sm">
           <caption class="sr-only">
             Historique des ventes
           </caption>
@@ -219,6 +496,9 @@
                   >
                     {{ statusLabel(sale.payment_status) }}
                   </span>
+                  @if (sale.pending_amount !== '0.00') {
+                    <p class="mt-1 text-[11px] font-medium text-amber-300">Paiement en attente</p>
+                  }
                 </td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex items-center justify-end gap-2">
@@ -229,7 +509,7 @@
                     >
                       Voir
                     </button>
-                    @if (sale.balance_due !== '0.00') {
+                    @if (sale.available_due !== '0.00') {
                       <button
                         type="button"
                         (click)="openPayment(sale)"
@@ -421,13 +701,33 @@
 
           <ul class="mt-2 space-y-2">
             @for (payment of sale.payments; track payment.id) {
-              <li
-                class="flex items-center justify-between gap-3 rounded-lg bg-emerald-950/40 px-3.5 py-2.5 text-sm"
-              >
-                <span class="text-slate-200">{{ paymentLabel(payment.method) }}</span>
-                <span class="font-semibold text-slate-100">
-                  {{ payment.amount | number: '1.2-2' }} FCFA
-                </span>
+              <li class="rounded-lg bg-emerald-950/40 px-3.5 py-2.5 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-slate-200">{{ paymentLabel(payment.method) }}</p>
+                    @if (payment.reference) {
+                      <p class="mt-0.5 font-mono text-xs text-slate-400">
+                        {{ payment.reference }}
+                      </p>
+                    }
+                  </div>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <span
+                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      [class]="verificationClasses(payment.status)"
+                    >
+                      {{ verificationLabel(payment.status) }}
+                    </span>
+                    <span class="font-semibold text-slate-100">
+                      {{ payment.amount | number: '1.2-2' }} FCFA
+                    </span>
+                  </div>
+                </div>
+                @if (payment.status === 'rejected' && payment.rejection_reason) {
+                  <p class="mt-1.5 text-xs text-red-300">
+                    Motif du rejet : {{ payment.rejection_reason }}
+                  </p>
+                }
               </li>
             } @empty {
               <li class="rounded-lg bg-emerald-950/40 px-3.5 py-3 text-sm text-slate-400">
@@ -450,6 +750,14 @@
                 {{ sale.paid_amount | number: '1.2-2' }} FCFA
               </dd>
             </div>
+            @if (sale.pending_amount !== '0.00') {
+              <div class="flex items-center justify-between">
+                <dt class="text-slate-400">En attente de vérification</dt>
+                <dd class="font-medium text-amber-300">
+                  {{ sale.pending_amount | number: '1.2-2' }} FCFA
+                </dd>
+              </div>
+            }
             <div class="flex items-center justify-between">
               <dt class="text-slate-400">Reste dû</dt>
               <dd
@@ -488,7 +796,7 @@
             </svg>
             {{ downloadingInvoiceId() === sale.id ? 'Génération…' : 'Facture PDF' }}
           </button>
-          @if (sale.balance_due !== '0.00') {
+          @if (sale.available_due !== '0.00') {
             <button
               type="button"
               (click)="openPayment(sale)"
@@ -524,11 +832,16 @@
       >
         <h2 id="sale-payment-title" class="text-xl font-bold text-white">Encaisser un règlement</h2>
         <p class="mt-1 text-sm text-slate-400">
-          Vente {{ sale.reference }} · reste dû :
+          Vente {{ sale.reference }} · disponible :
           <span class="font-semibold text-red-300">
-            {{ sale.balance_due | number: '1.2-2' }} FCFA
+            {{ sale.available_due | number: '1.2-2' }} FCFA
           </span>
         </p>
+        @if (sale.pending_amount !== '0.00') {
+          <p class="mt-1 text-xs font-medium text-amber-300">
+            {{ sale.pending_amount | number: '1.2-2' }} FCFA déjà en attente de vérification.
+          </p>
+        }
 
         <form class="mt-5 space-y-4" (ngSubmit)="submitPayment()">
           <div>
@@ -541,8 +854,9 @@
               type="number"
               min="0.01"
               step="0.01"
-              [max]="sale.balance_due"
+              [max]="sale.available_due"
               [(ngModel)]="paymentForm.amount"
+              (ngModelChange)="onPaymentFormChange()"
               class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
@@ -555,6 +869,7 @@
               id="payment-method"
               name="payment_method"
               [(ngModel)]="paymentForm.method"
+              (ngModelChange)="onPaymentFormChange()"
               class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="cash">Espèces</option>
@@ -568,6 +883,9 @@
           <div>
             <label for="payment-reference" class="mb-1.5 block text-sm font-medium text-slate-300">
               Référence
+              @if (requiresReference(paymentForm.method)) {
+                <span class="text-red-400">*</span>
+              }
             </label>
             <input
               id="payment-reference"
@@ -575,9 +893,19 @@
               type="text"
               maxlength="255"
               [(ngModel)]="paymentForm.reference"
-              placeholder="N° de transaction, chèque…"
+              (ngModelChange)="onPaymentFormChange()"
+              [placeholder]="
+                requiresReference(paymentForm.method)
+                  ? 'Référence obligatoire de la transaction'
+                  : 'N° de transaction, chèque…'
+              "
               class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
             />
+            @if (requiresReference(paymentForm.method)) {
+              <p class="mt-1.5 text-xs text-amber-300">
+                Le règlement sera enregistré comme « En attente de vérification ».
+              </p>
+            }
           </div>
 
           @if (paymentError()) {
@@ -604,6 +932,310 @@
               class="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ submittingPayment() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- Modale : detail d'un paiement manuel -->
+  @if (selectedManualPayment(); as payment) {
+    <div
+      class="fixed inset-0 z-[65] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
+      (click)="closeManualDetails()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-payment-detail-title"
+        class="my-auto w-full max-w-xl overflow-hidden rounded-2xl border border-emerald-800/60 bg-[#153322] shadow-2xl shadow-emerald-950/60"
+        (click)="$event.stopPropagation()"
+      >
+        <header
+          class="flex items-start justify-between gap-4 border-b border-emerald-800/40 px-6 py-4"
+        >
+          <div>
+            <h2 id="manual-payment-detail-title" class="text-lg font-semibold text-slate-100">
+              Paiement {{ payment.reference ?? '—' }}
+            </h2>
+            <p class="mt-1 text-xs text-slate-400">
+              {{ payment.sale_reference ?? '—' }} ·
+              {{ payment.customer_name ?? 'Client de passage' }}
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+            [class]="verificationClasses(payment.status)"
+          >
+            {{ verificationLabel(payment.status) }}
+          </span>
+        </header>
+
+        <div class="max-h-[65vh] overflow-y-auto px-6 py-5">
+          <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">Montant</dt>
+              <dd class="mt-1 text-base font-semibold text-slate-100">
+                {{ payment.amount | number: '1.2-2' }} FCFA
+              </dd>
+            </div>
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">Moyen</dt>
+              <dd class="mt-1 text-sm font-medium text-slate-100">
+                {{ paymentLabel(payment.method) }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">Client</dt>
+              <dd class="mt-1 text-sm font-medium text-slate-100">
+                {{ payment.customer_name ?? 'Client de passage' }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">Vendeur</dt>
+              <dd class="mt-1 text-sm font-medium text-slate-100">
+                {{ payment.seller_name ?? '—' }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">
+                Référence de transaction
+              </dt>
+              <dd class="mt-1 font-mono text-sm text-emerald-200">
+                {{ payment.reference ?? '—' }}
+              </dd>
+            </div>
+            <div class="rounded-lg bg-emerald-950/40 px-3.5 py-3">
+              <dt class="text-[11px] tracking-wide text-slate-400 uppercase">Enregistré le</dt>
+              <dd class="mt-1 text-sm text-slate-200">
+                {{ payment.created_at | date: 'dd/MM/yyyy à HH:mm' }}
+              </dd>
+            </div>
+          </dl>
+
+          @if (payment.status === 'confirmed') {
+            <div
+              class="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-3 text-sm"
+            >
+              <p class="font-medium text-emerald-200">Paiement confirmé</p>
+              <p class="mt-1 text-xs text-slate-300">
+                Par {{ payment.confirmed_by_name ?? '—' }}
+                @if (payment.confirmed_at) {
+                  le {{ payment.confirmed_at | date: 'dd/MM/yyyy à HH:mm' }}
+                }
+              </p>
+            </div>
+          } @else if (payment.status === 'rejected') {
+            <div class="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-sm">
+              <p class="font-medium text-red-300">Paiement rejeté</p>
+              <p class="mt-1 text-xs text-slate-300">
+                Par {{ payment.rejected_by_name ?? '—' }}
+                @if (payment.rejected_at) {
+                  le {{ payment.rejected_at | date: 'dd/MM/yyyy à HH:mm' }}
+                }
+              </p>
+              @if (payment.rejection_reason) {
+                <p class="mt-2 text-xs text-red-200">Motif : {{ payment.rejection_reason }}</p>
+              }
+            </div>
+          } @else {
+            <p
+              class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-sm text-amber-200"
+            >
+              Ce paiement attend encore une confirmation ou un rejet.
+            </p>
+          }
+
+          @if (payment.sale; as sale) {
+            <dl class="mt-5 space-y-2 border-t border-emerald-800/40 pt-4 text-sm">
+              <div class="flex items-center justify-between">
+                <dt class="text-slate-400">Total de la vente</dt>
+                <dd class="font-medium text-slate-100">
+                  {{ sale.total_amount | number: '1.2-2' }} FCFA
+                </dd>
+              </div>
+              <div class="flex items-center justify-between">
+                <dt class="text-slate-400">Déjà payé</dt>
+                <dd class="font-medium text-emerald-300">
+                  {{ sale.paid_amount | number: '1.2-2' }} FCFA
+                </dd>
+              </div>
+              @if (sale.pending_amount !== '0.00') {
+                <div class="flex items-center justify-between">
+                  <dt class="text-slate-400">En attente de vérification</dt>
+                  <dd class="font-medium text-amber-300">
+                    {{ sale.pending_amount | number: '1.2-2' }} FCFA
+                  </dd>
+                </div>
+              }
+              <div class="flex items-center justify-between">
+                <dt class="text-slate-400">Reste dû</dt>
+                <dd
+                  class="font-semibold"
+                  [class]="sale.balance_due === '0.00' ? 'text-slate-100' : 'text-red-300'"
+                >
+                  {{ sale.balance_due | number: '1.2-2' }} FCFA
+                </dd>
+              </div>
+            </dl>
+          }
+        </div>
+
+        <footer
+          class="flex flex-wrap items-center justify-end gap-3 border-t border-emerald-800/40 bg-emerald-950/20 px-6 py-4"
+        >
+          @if (payment.status === 'pending') {
+            <button
+              type="button"
+              (click)="openReview(payment, 'reject')"
+              class="rounded-lg border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/15"
+            >
+              Rejeter
+            </button>
+            <button
+              type="button"
+              (click)="openReview(payment, 'confirm')"
+              class="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+            >
+              Confirmer le paiement
+            </button>
+          }
+          <button
+            type="button"
+            (click)="closeManualDetails()"
+            class="rounded-lg border border-emerald-800/60 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/40"
+          >
+            Fermer
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- Modale : verification d'un paiement manuel -->
+  @if (reviewPayment(); as payment) {
+    <div
+      class="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      (click)="closeReview()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-payment-title"
+        class="w-full max-w-lg rounded-2xl border border-amber-500/40 bg-[#153322] p-6 shadow-2xl"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="manual-payment-title" class="text-xl font-bold text-white">
+              {{ reviewMode() === 'confirm' ? 'Confirmer le paiement' : 'Rejeter le paiement' }}
+            </h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Vente {{ payment.sale_reference ?? '—' }} ·
+              {{ payment.customer_name ?? 'Client de passage' }}
+            </p>
+          </div>
+          <span
+            class="rounded-full px-2.5 py-1 text-xs font-semibold"
+            [class]="verificationClasses(payment.status)"
+          >
+            {{ verificationLabel(payment.status) }}
+          </span>
+        </div>
+
+        <dl
+          class="mt-5 grid grid-cols-1 gap-2 rounded-lg bg-emerald-950/40 p-4 text-sm sm:grid-cols-2"
+        >
+          <div>
+            <dt class="text-xs text-slate-400">Montant</dt>
+            <dd class="mt-0.5 font-semibold text-slate-100">
+              {{ payment.amount | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-slate-400">Mode</dt>
+            <dd class="mt-0.5 font-medium text-slate-100">
+              {{ paymentLabel(payment.method) }}
+            </dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-xs text-slate-400">Référence de transaction</dt>
+            <dd class="mt-0.5 font-mono text-sm text-amber-200">
+              {{ payment.reference ?? '—' }}
+            </dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-xs text-slate-400">Enregistré le</dt>
+            <dd class="mt-0.5 text-slate-200">
+              {{ payment.created_at | date: 'dd/MM/yyyy à HH:mm' }}
+            </dd>
+          </div>
+        </dl>
+
+        <form class="mt-5 space-y-4" (ngSubmit)="submitReview()">
+          @if (reviewMode() === 'confirm') {
+            <p
+              class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
+            >
+              En confirmant, ce montant sera définitivement compté comme payé et ajouté au solde de
+              la vente.
+            </p>
+          } @else {
+            <div>
+              <label for="rejection-reason" class="mb-1.5 block text-sm font-medium text-slate-300">
+                Motif du rejet <span class="text-red-400">*</span>
+              </label>
+              <textarea
+                id="rejection-reason"
+                name="rejection_reason"
+                rows="3"
+                maxlength="500"
+                [ngModel]="reviewReason()"
+                (ngModelChange)="reviewReason.set($event)"
+                placeholder="Expliquez pourquoi le paiement ne peut pas être validé…"
+                class="w-full rounded-lg border border-emerald-800/60 bg-[#0a1912] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              ></textarea>
+              <p class="mt-1.5 text-xs text-slate-400">
+                Le paiement restera conservé dans l’historique et ne sera pas compté comme encaissé.
+              </p>
+            </div>
+          }
+
+          @if (reviewError()) {
+            <p
+              class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              role="alert"
+            >
+              {{ reviewError() }}
+            </p>
+          }
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              (click)="closeReview()"
+              [disabled]="reviewSubmitting()"
+              class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-emerald-900/50 disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="reviewSubmitting()"
+              [class]="
+                reviewMode() === 'confirm'
+                  ? 'rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60'
+                  : 'rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60'
+              "
+            >
+              {{
+                reviewSubmitting()
+                  ? 'Traitement…'
+                  : reviewMode() === 'confirm'
+                    ? 'Confirmer le paiement'
+                    : 'Rejeter le paiement'
+              }}
             </button>
           </div>
         </form>

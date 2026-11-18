@@ -1,5 +1,6 @@
 @php
     $brand = $company['business_name'] ?? config('quincaillerie.name', 'Quincaillerie Pro');
+    $usesPeriod = $usesPeriod ?? true;
     $periodLabel = 'du '.date('d/m/Y', strtotime($from)).' au '.date('d/m/Y', strtotime($to));
     $lineLabel = number_format($totalCount, 0, ',', ' ').' ligne'.($totalCount > 1 ? 's' : '');
 @endphp
@@ -291,7 +292,9 @@
                 <td class="header-document">
                     <p class="document-kicker">Rapport d’activité</p>
                     <p class="document-title">{{ $label }}</p>
-                    <p class="document-period">Période {{ $periodLabel }}</p>
+                    <p class="document-period">
+                        {{ $usesPeriod ? 'Période '.$periodLabel : 'État actuel — hors période' }}
+                    </p>
                 </td>
             </tr>
         </table>
@@ -300,8 +303,10 @@
     <table class="meta">
         <tr>
             <td>
-                <p class="meta-label">Période analysée</p>
-                <p class="meta-value">{{ $periodLabel }}</p>
+                <p class="meta-label">{{ $usesPeriod ? 'Période analysée' : 'Portée du rapport' }}</p>
+                <p class="meta-value">
+                    {{ $usesPeriod ? $periodLabel : 'État actuel (hors période)' }}
+                </p>
             </td>
             <td>
                 <p class="meta-label">Date de génération</p>
@@ -327,8 +332,12 @@
 
     @if (empty($rows))
         <div class="empty-state">
-            <strong>Aucune donnée pour cette période</strong>
-            <span>Aucune ligne ne correspond aux filtres sélectionnés. Modifiez la période ou la recherche.</span>
+            <strong>{{ $usesPeriod ? 'Aucune donnée pour cette période' : 'Aucune donnée disponible' }}</strong>
+            <span>
+                {{ $usesPeriod
+                    ? 'Aucune ligne ne correspond aux filtres sélectionnés. Modifiez la période ou la recherche.'
+                    : 'Aucun élément ne correspond aux filtres sélectionnés.' }}
+            </span>
         </div>
     @else
         <table class="data-table">

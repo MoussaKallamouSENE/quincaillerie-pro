@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Payment;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSaleRequest extends FormRequest
 {
@@ -39,7 +41,12 @@ class StoreSaleRequest extends FormRequest
             'payment' => ['sometimes', 'nullable', 'array'],
             'payment.method' => ['required_with:payment', 'string', 'in:cash,wave,orange_money,bank_transfer,check'],
             'payment.amount' => ['required_with:payment', 'numeric', 'min:0'],
-            'payment.reference' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'payment.reference' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn (): bool => Payment::requiresManualVerification((string) $this->input('payment.method'))),
+            ],
         ];
     }
 
@@ -65,6 +72,8 @@ class StoreSaleRequest extends FormRequest
             'payment.amount.required' => 'Le montant payé est obligatoire.',
             'payment.amount.numeric' => 'Le montant payé doit être un nombre.',
             'payment.amount.min' => 'Le montant payé ne peut pas être négatif.',
+            'payment.reference.required' => 'La référence de transaction est obligatoire pour Wave et Orange Money.',
+            'payment.reference.string' => 'La référence de transaction doit être une chaîne de caractères.',
         ];
     }
 

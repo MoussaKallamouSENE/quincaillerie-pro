@@ -58,6 +58,52 @@ class ReportsController extends Controller
     ];
 
     /**
+     * Rapports qui présentent un état instantané plutôt qu'une période.
+     *
+     * @var list<string>
+     */
+    private const PERIODLESS_TYPES = [
+        'stock', 'out_of_stock', 'low_stock', 'customers', 'suppliers',
+    ];
+
+    /**
+     * Libelles des statuts et types stockes en base.
+     *
+     * @var array<string, string>
+     */
+    private const PAYMENT_STATUS_LABELS = [
+        'paid' => 'Payée',
+        'partial' => 'Partielle',
+        'credit' => 'À crédit',
+    ];
+
+    /** @var array<string, string> */
+    private const PURCHASE_STATUS_LABELS = [
+        'pending' => 'En attente',
+        'received' => 'Réceptionnée',
+        'cancelled' => 'Annulée',
+    ];
+
+    /** @var array<string, string> */
+    private const STOCK_MOVEMENT_TYPE_LABELS = [
+        'in' => 'Entrée',
+        'out' => 'Sortie',
+        'adjustment' => 'Ajustement',
+    ];
+
+    /** @var array<string, string> */
+    private const CASH_SESSION_STATUS_LABELS = [
+        'open' => 'Ouverte',
+        'closed' => 'Clôturée',
+    ];
+
+    /** @var array<string, string> */
+    private const CASH_MOVEMENT_TYPE_LABELS = [
+        'in' => 'Entrée',
+        'out' => 'Sortie',
+    ];
+
+    /**
      * Nombre maximal de lignes dans un export PDF.
      */
     private const PDF_LIMIT = 500;
@@ -147,6 +193,7 @@ class ReportsController extends Controller
             'label' => self::LABELS[$type],
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
+            'usesPeriod' => ! in_array($type, self::PERIODLESS_TYPES, true),
             'generatedAt' => CarbonImmutable::now()->format('d/m/Y à H:i'),
             'company' => $company,
             'logoDataUri' => $this->logoDataUri($company),
@@ -159,7 +206,11 @@ class ReportsController extends Controller
             'truncated' => $total > self::PDF_LIMIT,
         ])->setPaper('a4', 'landscape');
 
-        return $pdf->download("rapport-{$type}-{$from->toDateString()}-{$to->toDateString()}.pdf");
+        $fileName = in_array($type, self::PERIODLESS_TYPES, true)
+            ? "rapport-{$type}-etat-actuel.pdf"
+            : "rapport-{$type}-{$from->toDateString()}-{$to->toDateString()}.pdf";
+
+        return $pdf->download($fileName);
     }
 
     /**
@@ -261,8 +312,14 @@ class ReportsController extends Controller
      */
     private function query(string $type, CarbonImmutable $from, CarbonImmutable $to, string $search): Builder
     {
+        $search = trim($search);
         $like = '%'.addcslashes($search, '%_\\').'%';
         $hasSearch = $search !== '';
+        $paymentStatuses = $this->matchingStatusValues($search, self::PAYMENT_STATUS_LABELS);
+        $purchaseStatuses = $this->matchingStatusValues($search, self::PURCHASE_STATUS_LABELS);
+        $stockMovementTypes = $this->matchingStatusValues($search, self::STOCK_MOVEMENT_TYPE_LABELS);
+        $cashSessionStatuses = $this->matchingStatusValues($search, self::CASH_SESSION_STATUS_LABELS);
+        $cashMovementTypes = $this->matchingStatusValues($search, self::CASH_MOVEMENT_TYPE_LABELS);
 
         return match ($type) {
             'sales' => Sale::query()
@@ -272,7 +329,8 @@ class ReportsController extends Controller
                 ->when($hasSearch, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
                     ->where('reference', 'like', $like)
                     ->orWhereHas('customer', fn (Builder $customer) => $customer->where('name', 'like', $like))
-                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)))),
+                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like))
+                    ->when($paymentStatuses !== [], fn (Builder $statusQuery) => $statusQuery->orWhereIn('payment_status', $paymentStatuses)))),
 
             'purchases' => Purchase::query()
                 ->with(['supplier:id,name', 'user:id,name'])
@@ -281,7 +339,8 @@ class ReportsController extends Controller
                 ->when($hasSearch, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
                     ->where('reference', 'like', $like)
                     ->orWhereHas('supplier', fn (Builder $supplier) => $supplier->where('name', 'like', $like))
-                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)))),
+                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like))
+                    ->when($purchaseStatuses !== [], fn (Builder $statusQuery) => $statusQuery->orWhereIn('status', $purchaseStatuses)))),
 
             'stock' => Product::query()
                 ->with(['category:id,name', 'unit:id,name'])
@@ -314,7 +373,8 @@ class ReportsController extends Controller
                     ->orWhereHas('product', fn (Builder $product) => $product
                         ->where('name', 'like', $like)
                         ->orWhere('sku', 'like', $like))
-                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)))),
+                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like))
+                    ->when($stockMovementTypes !== [], fn (Builder $typeQuery) => $typeQuery->orWhereIn('type', $stockMovementTypes)))),
 
             'customers' => Customer::query()
                 ->when($hasSearch, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
@@ -333,7 +393,8 @@ class ReportsController extends Controller
                 ->whereBetween('opened_at', [$from, $to])
                 ->when($hasSearch, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
                     ->where('status', 'like', $like)
-                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)))),
+                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like))
+                    ->when($cashSessionStatuses !== [], fn (Builder $statusQuery) => $statusQuery->orWhereIn('status', $cashSessionStatuses)))),
 
             'cash_movements' => CashMovement::query()
                 ->with(['user:id,name', 'cashSession:id,opened_at,status'])
@@ -341,7 +402,8 @@ class ReportsController extends Controller
                 ->when($hasSearch, fn (Builder $query) => $query->where(fn (Builder $scope) => $scope
                     ->where('reason', 'like', $like)
                     ->orWhere('type', 'like', $like)
-                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)))),
+                    ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like))
+                    ->when($cashMovementTypes !== [], fn (Builder $typeQuery) => $typeQuery->orWhereIn('type', $cashMovementTypes)))),
 
             'expenses' => Expense::query()
                 ->with(['user:id,name', 'cashSession:id,opened_at'])
@@ -692,7 +754,7 @@ class ReportsController extends Controller
                     $this->dateTime($session->opened_at),
                     $this->dateTime($session->closed_at),
                     $session->user?->name ?? '—',
-                    $session->status === 'open' ? 'Ouverte' : 'Clôturée',
+                    self::CASH_SESSION_STATUS_LABELS[$session->status] ?? $session->status,
                     $this->money($session->opening_balance),
                     $this->money($session->closing_balance),
                     $this->money($expected),
@@ -729,7 +791,7 @@ class ReportsController extends Controller
                 $this->dateTime($movement->created_at),
                 $this->dateTime($movement->cashSession?->opened_at),
                 $movement->user?->name ?? '—',
-                $movement->type === 'in' ? 'Entrée' : 'Sortie',
+                self::CASH_MOVEMENT_TYPE_LABELS[$movement->type] ?? $movement->type,
                 (string) $movement->reason,
                 $this->money($movement->amount),
             ])->all(),
@@ -851,33 +913,43 @@ class ReportsController extends Controller
         return $value instanceof CarbonInterface ? $value->format('d/m/Y H:i') : '—';
     }
 
+    /**
+     * Valeurs stockées dont le libellé français contient la recherche.
+     *
+     * @param  array<string, string>  $labels
+     * @return list<string>
+     */
+    private function matchingStatusValues(string $search, array $labels): array
+    {
+        $needle = Str::lower(Str::ascii(trim($search)));
+
+        if ($needle === '') {
+            return [];
+        }
+
+        $matches = [];
+
+        foreach ($labels as $value => $label) {
+            if (Str::contains(Str::lower(Str::ascii($label)), $needle)) {
+                $matches[] = $value;
+            }
+        }
+
+        return $matches;
+    }
+
     private function paymentStatus(string $status): string
     {
-        return match ($status) {
-            'paid' => 'Payée',
-            'partial' => 'Partielle',
-            'credit' => 'À crédit',
-            default => $status,
-        };
+        return self::PAYMENT_STATUS_LABELS[$status] ?? $status;
     }
 
     private function purchaseStatus(string $status): string
     {
-        return match ($status) {
-            'pending' => 'En attente',
-            'received' => 'Réceptionnée',
-            'cancelled' => 'Annulée',
-            default => $status,
-        };
+        return self::PURCHASE_STATUS_LABELS[$status] ?? $status;
     }
 
     private function stockMovementType(string $type): string
     {
-        return match ($type) {
-            'in' => 'Entrée',
-            'out' => 'Sortie',
-            'adjustment' => 'Ajustement',
-            default => $type,
-        };
+        return self::STOCK_MOVEMENT_TYPE_LABELS[$type] ?? $type;
     }
 }

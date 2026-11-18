@@ -35,11 +35,57 @@ class RoleAndPermissionSeeder extends Seeder
             'guard_name' => 'web',
         ]);
 
+        $demanderRemboursement = Permission::firstOrCreate([
+            'name' => 'demander_remboursement',
+            'guard_name' => 'web',
+        ]);
+
+        $approuverRemboursement = Permission::firstOrCreate([
+            'name' => 'approuver_remboursement',
+            'guard_name' => 'web',
+        ]);
+
+        $annulerRemboursement = Permission::firstOrCreate([
+            'name' => 'annuler_remboursement',
+            'guard_name' => 'web',
+        ]);
+
+        $executerRemboursement = Permission::firstOrCreate([
+            'name' => 'executer_remboursement',
+            'guard_name' => 'web',
+        ]);
+
+        $reconcilierRemboursement = Permission::firstOrCreate([
+            'name' => 'reconcilier_remboursement',
+            'guard_name' => 'web',
+        ]);
+
         $admin->givePermissionTo($gererUtilisateurs);
         $gerant->givePermissionTo($gererUtilisateurs);
 
         $admin->givePermissionTo($ajusterStock);
         $gerant->givePermissionTo($ajusterStock);
+
+        $admin->givePermissionTo([
+            $demanderRemboursement,
+            $approuverRemboursement,
+            $annulerRemboursement,
+            $reconcilierRemboursement,
+        ]);
+
+        $gerant->givePermissionTo([
+            $demanderRemboursement,
+            $approuverRemboursement,
+            $annulerRemboursement,
+            $executerRemboursement,
+            $reconcilierRemboursement,
+        ]);
+
+        $employe->givePermissionTo([
+            $demanderRemboursement,
+            $executerRemboursement,
+        ]);
+
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

@@ -2,7 +2,16 @@ import { HttpClient, HttpResourceRequest } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Sale, SalePayload, SalePaymentPayload, SaleQuery, SaleResponse, SalesPage } from './sale.model';
+import {
+  ManualPaymentQuery,
+  ManualPaymentsResponse,
+  Sale,
+  SalePayload,
+  SalePaymentPayload,
+  SaleQuery,
+  SaleResponse,
+  SalesPage,
+} from './sale.model';
 
 /**
  * Client HTTP des ventes.
@@ -22,6 +31,9 @@ export class SaleService {
 
   /** URL de la collection ventes. */
   readonly salesUrl = `${this.baseUrl}/sales`;
+
+  /** URL de la file de verification des paiements manuels. */
+  readonly manualPaymentsUrl = `${this.baseUrl}/manual-payments`;
 
   /**
    * Historique pagine des ventes.
@@ -74,6 +86,52 @@ export class SaleService {
   }
 
   /**
+   * Liste les paiements manuels, en attente par defaut.
+   *
+   * @param query Filtres appliques par l'API (`status`, `method`, `search`).
+   */
+  getManualPayments(query: ManualPaymentQuery = {}): Observable<ManualPaymentsResponse> {
+    return this.http.get<ManualPaymentsResponse>(this.manualPaymentsUrl, {
+      params: toManualPaymentParams(query),
+    });
+  }
+
+  /**
+   * Confirme un paiement Wave ou Orange Money en attente.
+   *
+   * @param paymentId Identifiant du paiement manuel.
+   */
+  confirmManualPayment(paymentId: number): Observable<Sale> {
+    return this.http
+      .post<SaleResponse>(`${this.manualPaymentsUrl}/${paymentId}/confirm`, {})
+      .pipe(map((response) => response.data));
+  }
+
+  /**
+   * Rejette un paiement Wave ou Orange Money en attente.
+   *
+   * @param paymentId Identifiant du paiement manuel.
+   * @param reason Motif obligatoire du rejet.
+   */
+  rejectManualPayment(paymentId: number, reason: string): Observable<Sale> {
+    return this.http
+      .post<SaleResponse>(`${this.manualPaymentsUrl}/${paymentId}/reject`, { reason })
+      .pipe(map((response) => response.data));
+  }
+
+  /**
+   * Descripteur de requete `GET /api/manual-payments`.
+   *
+   * @param query Filtres appliques par l'API, statut `pending` par defaut.
+   */
+  manualPaymentsRequest(query: ManualPaymentQuery = {}): HttpResourceRequest {
+    return {
+      url: this.manualPaymentsUrl,
+      params: toManualPaymentParams(query),
+    };
+  }
+
+  /**
    * Telecharge la facture PDF d'une vente.
    *
    * `responseType: 'blob'` empeche Angular de deserialiser la reponse : les
@@ -97,6 +155,31 @@ export class SaleService {
       params: toParams(query),
     };
   }
+}
+
+/** Convertit les filtres de la file manuelle en parametres HTTP. */
+function toManualPaymentParams(query: ManualPaymentQuery): Record<string, string> {
+  const params: Record<string, string> = {
+    status: query.status ?? 'pending',
+  };
+
+  if (query.method) {
+    params['method'] = query.method;
+  }
+
+  if (query.search) {
+    params['search'] = query.search;
+  }
+
+  if (query.per_page !== undefined) {
+    params['per_page'] = String(query.per_page);
+  }
+
+  if (query.page !== undefined) {
+    params['page'] = String(query.page);
+  }
+
+  return params;
 }
 
 /** Convertit un filtre de recherche en parametres de requete HTTP. */

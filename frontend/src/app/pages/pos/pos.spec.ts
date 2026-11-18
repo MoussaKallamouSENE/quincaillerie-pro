@@ -141,6 +141,8 @@ function buildSale(overrides: Partial<Sale> = {}): Sale {
     cash_session_id: 7,
     total_amount: '500.00',
     paid_amount: '500.00',
+    pending_amount: '0.00',
+    available_due: '0.00',
     balance_due: '0.00',
     payment_status: 'paid',
     items: [],
@@ -419,6 +421,29 @@ describe('Pos', () => {
     const total = element.querySelector('[aria-live="polite"]')?.textContent ?? '';
     expect(normalizeSpaces(total)).toContain('0,00');
     expect(toastService.toasts()[0]?.message).toContain('VTE-000012');
+  });
+
+  it('should calculate change only for cash payments', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    setField('#pos-received', '300');
+
+    expect(normalizeSpaces(element.textContent ?? '')).toContain('Monnaie à rendre : 50,00 FCFA');
+
+    for (const method of ['Wave', 'Orange Money']) {
+      buttonStartingWith(method)?.click();
+      fixture.detectChanges();
+
+      setField('#pos-received', '300');
+
+      expect(normalizeSpaces(element.textContent ?? '')).not.toContain('Monnaie à rendre');
+    }
   });
 
   it('should reuse the same idempotency key when a failed sale is retried', async () => {
@@ -802,5 +827,151 @@ describe('Pos', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Aucune dépense enregistrée pour cette session.',
     );
+  });
+
+  it('should require a transaction reference for Wave and Orange Money', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    for (const method of ['Wave', 'Orange Money']) {
+      buttonStartingWith(method)?.click();
+      fixture.detectChanges();
+
+      buttonStartingWith('Valider la vente')?.click();
+      fixture.detectChanges();
+
+      expect(element.textContent).toContain(
+        'La référence de transaction est obligatoire pour Wave et Orange Money.',
+      );
+      httpMock.expectNone(isSalesRequest);
+
+      buttonStartingWith('Espèces')?.click();
+      fixture.detectChanges();
+    }
+  });
+
+  it('should refuse a Wave or Orange Money sale without a positive amount', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    for (const method of ['Wave', 'Orange Money']) {
+      for (const amount of ['0', '-10']) {
+        buttonStartingWith(method)?.click();
+        fixture.detectChanges();
+
+        setField('#pos-received', amount);
+
+        buttonStartingWith('Valider la vente')?.click();
+        fixture.detectChanges();
+
+        expect(element.textContent).toContain(
+          'Le montant reçu doit être supérieur à zéro pour Wave et Orange Money.',
+        );
+        httpMock.expectNone(isSalesRequest);
+      }
+    }
+  });
+
+  it('should reset the payment reference when the cart is cleared', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Boulon M8')?.click();
+    buttonStartingWith('Wave')?.click();
+    fixture.detectChanges();
+
+    setField('#pos-payment-reference', 'WAVE-ANCIENNE');
+
+    expect((element.querySelector('#pos-payment-reference') as HTMLInputElement).value).toBe(
+      'WAVE-ANCIENNE',
+    );
+
+    buttonStartingWith('Vider le panier')?.click();
+    fixture.detectChanges();
+
+    expect((element.querySelector('#pos-payment-reference') as HTMLInputElement).value).toBe('');
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    expect((element.querySelector('#pos-payment-reference') as HTMLInputElement).value).toBe('');
+  });
+
+  it('should send the reference and announce a pending manual payment', async () => {
+    await flushSession(buildCashSession());
+    await flushCatalogue([buildProduct()]);
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Wave')?.click();
+    fixture.detectChanges();
+
+    setField('#pos-payment-reference', 'WAVE-999');
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Sélectionnez un client');
+    httpMock.expectNone(isSalesRequest);
+
+    const select = element.querySelector('#pos-customer') as HTMLSelectElement;
+    select.value = '3';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    buttonStartingWith('Valider la vente')?.click();
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne(isSalesRequest);
+
+    expect(request.request.body).toEqual({
+      customer_id: 3,
+      items: [{ product_id: 1, quantity: 1 }],
+      payment: { method: 'wave', amount: 250, reference: 'WAVE-999' },
+      idempotency_key: expect.any(String),
+    });
+
+    request.flush({
+      data: buildSale({
+        paid_amount: '0.00',
+        pending_amount: '250.00',
+        available_due: '0.00',
+        balance_due: '250.00',
+        total_amount: '250.00',
+        payment_status: 'credit',
+      }),
+    });
+    await settle();
+
+    const dialogText = normalizeSpaces(dialog()?.textContent ?? '');
+
+    expect(dialogText).toContain('Vente enregistrée');
+    expect(dialogText).toContain('Paiement en attente de vérification');
+    expect(dialogText).toContain('250,00');
+    expect(toastService.toasts()[0]?.message).toContain('en attente de vérification');
+
+    // La vente suivante repart avec une reference vierge.
+    buttonStartingWith('Nouvelle vente')?.click();
+    fixture.detectChanges();
+
+    buttonStartingWith('Wave')?.click();
+    fixture.detectChanges();
+
+    expect((element.querySelector('#pos-payment-reference') as HTMLInputElement).value).toBe('');
   });
 });

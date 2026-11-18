@@ -11,7 +11,7 @@
     </div>
   </header>
 
-  @if (loading() || companyLoading()) {
+  @if (loading() || companyLoading() || (isAdmin() && !companyLoaded())) {
     <p class="sr-only" role="status">Chargement des paramètres…</p>
     <div class="grid gap-5 xl:grid-cols-2" aria-hidden="true">
       @for (item of [1, 2, 3, 4]; track item) {
@@ -52,12 +52,12 @@
         </div>
 
         @if (companyError()) {
-          <p
+          <div
             role="alert"
-            class="mt-5 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"
+            class="mt-5 flex flex-col gap-3 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200 sm:flex-row sm:items-center"
           >
             <svg
-              class="mt-0.5 h-4 w-4 shrink-0"
+              class="h-4 w-4 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -70,213 +70,277 @@
                 d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
               />
             </svg>
-            {{ companyError() }}
-          </p>
+            <span class="flex-1">{{ companyError() }}</span>
+            @if (companyLoadFailed()) {
+              <button
+                type="button"
+                class="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-red-300/50 px-3 py-1.5 text-xs font-semibold text-red-100 transition hover:bg-red-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
+                [disabled]="companyLoading()"
+                (click)="retryCompany()"
+              >
+                Réessayer
+              </button>
+            }
+          </div>
         }
 
-        <form
-          class="mt-5 grid gap-4 sm:grid-cols-2"
-          [formGroup]="companyForm"
-          (ngSubmit)="saveCompany()"
-        >
-          <div class="space-y-1.5">
-            <label for="company-business-name" class="block text-sm font-medium text-slate-300">
-              Nom commercial
-            </label>
-            <input
-              id="company-business-name"
-              class="h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              formControlName="business_name"
-              autocomplete="organization"
-              [attr.aria-invalid]="fieldError(companyForm.controls.business_name) ? 'true' : null"
-              [attr.aria-describedby]="
-                fieldError(companyForm.controls.business_name)
-                  ? 'company-business-name-error'
-                  : null
-              "
-            />
-            @if (fieldError(companyForm.controls.business_name); as message) {
-              <p id="company-business-name-error" class="text-xs text-red-400">{{ message }}</p>
-            }
-          </div>
+        @if (!companyLoadFailed()) {
+          <form
+            class="mt-5 grid gap-4 sm:grid-cols-2"
+            [formGroup]="companyForm"
+            (ngSubmit)="saveCompany()"
+          >
+            <p class="text-xs text-slate-400 sm:col-span-2">
+              Les champs marqués d’un
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+              sont obligatoires.
+            </p>
 
-          <div class="space-y-1.5">
-            <label for="company-phone" class="block text-sm font-medium text-slate-300">
-              Téléphone
-            </label>
-            <input
-              id="company-phone"
-              class="h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              formControlName="phone"
-              autocomplete="tel"
-              [attr.aria-invalid]="fieldError(companyForm.controls.phone) ? 'true' : null"
-              [attr.aria-describedby]="
-                fieldError(companyForm.controls.phone) ? 'company-phone-error' : null
-              "
-            />
-            @if (fieldError(companyForm.controls.phone); as message) {
-              <p id="company-phone-error" class="text-xs text-red-400">{{ message }}</p>
-            }
-          </div>
-
-          <div class="space-y-1.5">
-            <label for="company-email" class="block text-sm font-medium text-slate-300">
-              E-mail
-            </label>
-            <input
-              id="company-email"
-              class="h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              type="email"
-              formControlName="email"
-              autocomplete="email"
-              [attr.aria-invalid]="fieldError(companyForm.controls.email) ? 'true' : null"
-              [attr.aria-describedby]="
-                fieldError(companyForm.controls.email) ? 'company-email-error' : null
-              "
-            />
-            @if (fieldError(companyForm.controls.email); as message) {
-              <p id="company-email-error" class="text-xs text-red-400">{{ message }}</p>
-            }
-          </div>
-
-          <div class="space-y-1.5 sm:col-span-2">
-            <label for="company-address" class="block text-sm font-medium text-slate-300">
-              Adresse
-            </label>
-            <textarea
-              id="company-address"
-              class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              rows="2"
-              formControlName="address"
-              autocomplete="street-address"
-              [attr.aria-invalid]="fieldError(companyForm.controls.address) ? 'true' : null"
-              [attr.aria-describedby]="
-                fieldError(companyForm.controls.address) ? 'company-address-error' : null
-              "
-            ></textarea>
-            @if (fieldError(companyForm.controls.address); as message) {
-              <p id="company-address-error" class="text-xs text-red-400">{{ message }}</p>
-            }
-          </div>
-
-          <div class="space-y-1.5 sm:col-span-2">
-            <label for="company-invoice-footer" class="block text-sm font-medium text-slate-300">
-              Pied de facture
-            </label>
-            <textarea
-              id="company-invoice-footer"
-              class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              rows="2"
-              formControlName="invoice_footer"
-              [attr.aria-invalid]="fieldError(companyForm.controls.invoice_footer) ? 'true' : null"
-              [attr.aria-describedby]="
-                fieldError(companyForm.controls.invoice_footer) ? 'company-footer-error' : null
-              "
-            ></textarea>
-            @if (fieldError(companyForm.controls.invoice_footer); as message) {
-              <p id="company-footer-error" class="text-xs text-red-400">{{ message }}</p>
-            }
-          </div>
-
-          <div class="sm:col-span-2">
-            <p class="text-sm font-medium text-slate-300">Logo de l’entreprise</p>
-            <div
-              class="mt-2 flex flex-col gap-3 rounded-xl border border-dashed border-emerald-800/50 bg-emerald-950/30 p-4 sm:flex-row sm:items-center"
-            >
-              <div
-                class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-emerald-800/50 bg-emerald-950/40"
-              >
-                @if (logoPreviewUrl()) {
-                  <img
-                    [src]="logoPreviewUrl()"
-                    alt="Aperçu du logo sélectionné"
-                    class="h-full w-full object-contain p-1"
-                  />
-                } @else {
-                  <svg
-                    class="h-7 w-7 text-emerald-400"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-                    />
-                  </svg>
-                }
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <label
-                  class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-within:ring-2 focus-within:ring-emerald-400/60"
-                  [class.opacity-60]="uploadingLogo()"
+            <div class="space-y-1.5 sm:col-span-2">
+              <label for="company-business-name" class="block text-sm font-medium text-slate-200">
+                Nom commercial
+                <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="company-business-name"
+                class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                formControlName="business_name"
+                autocomplete="organization"
+                placeholder="Ex. Quincaillerie Pro"
+                [attr.aria-required]="true"
+                [attr.aria-invalid]="fieldError(companyForm.controls.business_name) ? 'true' : null"
+                [attr.aria-describedby]="
+                  fieldError(companyForm.controls.business_name)
+                    ? 'company-business-name-error'
+                    : null
+                "
+              />
+              @if (fieldError(companyForm.controls.business_name); as message) {
+                <p
+                  id="company-business-name-error"
+                  class="text-xs font-medium text-red-300"
+                  role="alert"
                 >
-                  <svg
-                    class="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5"
+                  {{ message }}
+                </p>
+              }
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="company-phone" class="block text-sm font-medium text-slate-200">
+                Téléphone
+                <span class="ml-1 font-normal text-slate-400">(facultatif)</span>
+              </label>
+              <input
+                id="company-phone"
+                class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                formControlName="phone"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="+225 07 00 00 00 00"
+                [attr.aria-invalid]="fieldError(companyForm.controls.phone) ? 'true' : null"
+                [attr.aria-describedby]="
+                  fieldError(companyForm.controls.phone) ? 'company-phone-error' : null
+                "
+              />
+              @if (fieldError(companyForm.controls.phone); as message) {
+                <p id="company-phone-error" class="text-xs font-medium text-red-300" role="alert">
+                  {{ message }}
+                </p>
+              }
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="company-email" class="block text-sm font-medium text-slate-200">
+                E-mail
+                <span class="ml-1 font-normal text-slate-400">(facultatif)</span>
+              </label>
+              <input
+                id="company-email"
+                class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                type="email"
+                formControlName="email"
+                autocomplete="email"
+                placeholder="contact@quincaillerie.ci"
+                [attr.aria-invalid]="fieldError(companyForm.controls.email) ? 'true' : null"
+                [attr.aria-describedby]="
+                  fieldError(companyForm.controls.email) ? 'company-email-error' : null
+                "
+              />
+              @if (fieldError(companyForm.controls.email); as message) {
+                <p id="company-email-error" class="text-xs font-medium text-red-300" role="alert">
+                  {{ message }}
+                </p>
+              }
+            </div>
+
+            <div class="space-y-1.5 sm:col-span-2">
+              <label for="company-address" class="block text-sm font-medium text-slate-200">
+                Adresse
+                <span class="ml-1 font-normal text-slate-400">(facultatif)</span>
+              </label>
+              <textarea
+                id="company-address"
+                class="settings-field w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                rows="2"
+                formControlName="address"
+                autocomplete="street-address"
+                placeholder="Rue, quartier, ville"
+                [attr.aria-invalid]="fieldError(companyForm.controls.address) ? 'true' : null"
+                [attr.aria-describedby]="
+                  fieldError(companyForm.controls.address) ? 'company-address-error' : null
+                "
+              ></textarea>
+              @if (fieldError(companyForm.controls.address); as message) {
+                <p id="company-address-error" class="text-xs font-medium text-red-300" role="alert">
+                  {{ message }}
+                </p>
+              }
+            </div>
+
+            <div class="space-y-1.5 sm:col-span-2">
+              <label for="company-invoice-footer" class="block text-sm font-medium text-slate-200">
+                Pied de facture
+                <span class="ml-1 font-normal text-slate-400">(facultatif)</span>
+              </label>
+              <textarea
+                id="company-invoice-footer"
+                class="settings-field w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                rows="2"
+                formControlName="invoice_footer"
+                placeholder="Mentions de remerciement ou coordonnées bancaires"
+                [attr.aria-invalid]="
+                  fieldError(companyForm.controls.invoice_footer) ? 'true' : null
+                "
+                [attr.aria-describedby]="
+                  fieldError(companyForm.controls.invoice_footer) ? 'company-footer-error' : null
+                "
+              ></textarea>
+              @if (fieldError(companyForm.controls.invoice_footer); as message) {
+                <p id="company-footer-error" class="text-xs font-medium text-red-300" role="alert">
+                  {{ message }}
+                </p>
+              }
+            </div>
+
+            <div class="sm:col-span-2">
+              <p class="text-sm font-medium text-slate-300">Logo de l’entreprise</p>
+              <div
+                class="mt-2 flex flex-col gap-3 rounded-xl border border-dashed border-emerald-800/50 bg-emerald-950/30 p-4 sm:flex-row sm:items-center"
+              >
+                <div
+                  class="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-emerald-800/50 bg-emerald-950/40"
+                >
+                  @if (logoPreviewUrl() && !logoPreviewFailed()) {
+                    <img
+                      [src]="logoPreviewUrl()"
+                      alt="Aperçu du logo de l’entreprise"
+                      class="h-full w-full object-contain p-1"
+                      (error)="handleLogoPreviewError()"
                     />
-                  </svg>
-                  {{ uploadingLogo() ? 'Téléversement…' : 'Choisir une image' }}
-                  <input
-                    class="sr-only"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    [disabled]="uploadingLogo()"
-                    (change)="chooseLogo($event)"
-                  />
-                </label>
-
-                <p class="mt-2 text-xs text-slate-400">PNG, JPEG ou WebP · 2 Mo maximum.</p>
-
-                @if (uploadingLogo()) {
-                  <p class="mt-1 flex items-center gap-1.5 text-xs text-emerald-300">
+                  } @else if (logoLoading()) {
                     <span
-                      class="h-3 w-3 animate-spin rounded-full border-2 border-emerald-300/30 border-t-emerald-300"
-                      aria-hidden="true"
+                      class="h-5 w-5 animate-spin rounded-full border-2 border-emerald-300/30 border-t-emerald-300"
+                      role="status"
+                      aria-label="Chargement du logo"
                     ></span>
-                    Envoi du logo en cours…
-                  </p>
-                } @else if (logoName()) {
-                  <p class="mt-1 text-xs text-emerald-300">Logo enregistré : {{ logoName() }}</p>
-                } @else if (logoStored()) {
-                  <p class="mt-1 text-xs text-slate-400">Un logo est déjà enregistré.</p>
-                }
+                  } @else {
+                    <svg
+                      class="h-7 w-7 text-emerald-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      aria-hidden="true"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
+                      />
+                    </svg>
+                  }
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <label
+                    class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-within:ring-2 focus-within:ring-emerald-400/60"
+                    [class.opacity-60]="uploadingLogo()"
+                  >
+                    <svg
+                      class="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      aria-hidden="true"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5"
+                      />
+                    </svg>
+                    {{ uploadingLogo() ? 'Téléversement…' : 'Choisir une image' }}
+                    <input
+                      class="sr-only"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      [disabled]="uploadingLogo()"
+                      (change)="chooseLogo($event)"
+                    />
+                  </label>
+
+                  <p class="mt-2 text-xs text-slate-400">PNG, JPEG ou WebP · 2 Mo maximum.</p>
+
+                  @if (uploadingLogo()) {
+                    <p
+                      class="mt-1 flex items-center gap-1.5 text-xs text-emerald-200"
+                      role="status"
+                    >
+                      <span
+                        class="h-3 w-3 animate-spin rounded-full border-2 border-emerald-300/30 border-t-emerald-300"
+                        aria-hidden="true"
+                      ></span>
+                      Envoi du logo en cours…
+                    </p>
+                  } @else if (logoLoading()) {
+                    <p class="mt-1 text-xs text-slate-400" role="status">
+                      Chargement du logo enregistré…
+                    </p>
+                  } @else if (logoPreviewFailed()) {
+                    <p class="mt-1 text-xs text-amber-300">
+                      L’aperçu du logo n’a pas pu être affiché. Vous pouvez choisir une autre image.
+                    </p>
+                  } @else if (logoName()) {
+                    <p class="mt-1 text-xs text-emerald-200">Logo enregistré : {{ logoName() }}</p>
+                  } @else if (logoStored()) {
+                    <p class="mt-1 text-xs text-slate-400">Logo actuel de l’entreprise.</p>
+                  }
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="flex flex-wrap items-center gap-3 sm:col-span-2">
-            <button
-              type="submit"
-              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              [disabled]="savingCompany() || uploadingLogo()"
-            >
-              @if (savingCompany()) {
-                <span
-                  class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                  aria-hidden="true"
-                ></span>
-              }
-              {{ savingCompany() ? 'Enregistrement…' : 'Enregistrer les informations' }}
-            </button>
-            <span class="text-xs text-slate-400">
-              Le logo enregistré apparaîtra sur les prochaines factures.
-            </span>
-          </div>
-        </form>
+            <div class="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <button
+                type="submit"
+                class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/40 transition hover:bg-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#153322] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                [disabled]="savingCompany() || uploadingLogo()"
+              >
+                @if (savingCompany()) {
+                  <span
+                    class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    aria-hidden="true"
+                  ></span>
+                }
+                {{ savingCompany() ? 'Enregistrement…' : 'Enregistrer les informations' }}
+              </button>
+              <span class="text-xs text-slate-400">
+                Le logo enregistré apparaîtra sur les prochaines factures.
+              </span>
+            </div>
+          </form>
+        }
       </section>
     }
 
@@ -360,58 +424,82 @@
         }
 
         <form class="mt-5 space-y-4" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
-          <label class="block text-sm font-medium text-slate-300">
-            Nom
+          <div class="space-y-1.5">
+            <label for="profile-name" class="block text-sm font-medium text-slate-200">
+              Nom
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="profile-name"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               formControlName="name"
               autocomplete="name"
+              placeholder="Votre nom"
+              [attr.aria-required]="true"
               [attr.aria-invalid]="fieldError(profileForm.controls.name) ? 'true' : null"
               [attr.aria-describedby]="
                 fieldError(profileForm.controls.name) ? 'profile-name-error' : null
               "
             />
-          </label>
-          @if (fieldError(profileForm.controls.name); as message) {
-            <p id="profile-name-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            @if (fieldError(profileForm.controls.name); as message) {
+              <p id="profile-name-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
-          <label class="block text-sm font-medium text-slate-300">
-            E-mail
+          <div class="space-y-1.5">
+            <label for="profile-email" class="block text-sm font-medium text-slate-200">
+              E-mail
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="profile-email"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               type="email"
               formControlName="email"
               autocomplete="email"
+              placeholder="vous@exemple.ci"
+              [attr.aria-required]="true"
               [attr.aria-invalid]="fieldError(profileForm.controls.email) ? 'true' : null"
               [attr.aria-describedby]="
                 fieldError(profileForm.controls.email) ? 'profile-email-error' : null
               "
             />
-          </label>
-          @if (fieldError(profileForm.controls.email); as message) {
-            <p id="profile-email-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            @if (fieldError(profileForm.controls.email); as message) {
+              <p id="profile-email-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
-          <label class="block text-sm font-medium text-slate-300">
-            Téléphone
+          <div class="space-y-1.5">
+            <label for="profile-phone" class="block text-sm font-medium text-slate-200">
+              Téléphone
+              <span class="ml-1 font-normal text-slate-400">(facultatif)</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="profile-phone"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               formControlName="phone"
               autocomplete="tel"
+              inputmode="tel"
+              placeholder="+225 07 00 00 00 00"
               [attr.aria-invalid]="fieldError(profileForm.controls.phone) ? 'true' : null"
               [attr.aria-describedby]="
                 fieldError(profileForm.controls.phone) ? 'profile-phone-error' : null
               "
             />
-          </label>
-          @if (fieldError(profileForm.controls.phone); as message) {
-            <p id="profile-phone-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            @if (fieldError(profileForm.controls.phone); as message) {
+              <p id="profile-phone-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/40 transition hover:bg-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#153322] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             [disabled]="savingProfile()"
           >
             @if (savingProfile()) {
@@ -430,7 +518,7 @@
       >
         <div class="flex items-start gap-3">
           <span
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
             aria-hidden="true"
           >
             <svg
@@ -466,13 +554,28 @@
         }
 
         <form class="mt-5 space-y-4" [formGroup]="passwordForm" (ngSubmit)="changePassword()">
-          <label class="block text-sm font-medium text-slate-300">
-            Mot de passe actuel
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            class="sr-only"
+            [value]="profileForm.controls.email.value"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+
+          <div class="space-y-1.5">
+            <label for="password-current" class="block text-sm font-medium text-slate-200">
+              Mot de passe actuel
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="password-current"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               type="password"
               formControlName="current_password"
               autocomplete="current-password"
+              [attr.aria-required]="true"
               [attr.aria-invalid]="
                 fieldError(passwordForm.controls.current_password) ? 'true' : null
               "
@@ -480,18 +583,25 @@
                 fieldError(passwordForm.controls.current_password) ? 'password-current-error' : null
               "
             />
-          </label>
-          @if (fieldError(passwordForm.controls.current_password); as message) {
-            <p id="password-current-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            @if (fieldError(passwordForm.controls.current_password); as message) {
+              <p id="password-current-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
-          <label class="block text-sm font-medium text-slate-300">
-            Nouveau mot de passe
+          <div class="space-y-1.5">
+            <label for="password-new" class="block text-sm font-medium text-slate-200">
+              Nouveau mot de passe
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="password-new"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               type="password"
               formControlName="password"
               autocomplete="new-password"
+              [attr.aria-required]="true"
               [attr.aria-invalid]="fieldError(passwordForm.controls.password) ? 'true' : null"
               [attr.aria-describedby]="
                 fieldError(passwordForm.controls.password)
@@ -499,36 +609,51 @@
                   : 'password-new-hint'
               "
             />
-          </label>
-          <p id="password-new-hint" class="text-xs text-slate-400">8 caractères minimum.</p>
-          @if (fieldError(passwordForm.controls.password); as message) {
-            <p id="password-new-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            <p id="password-new-hint" class="text-xs text-slate-400">8 caractères minimum.</p>
+            @if (fieldError(passwordForm.controls.password); as message) {
+              <p id="password-new-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
-          <label class="block text-sm font-medium text-slate-300">
-            Confirmation
+          <div class="space-y-1.5">
+            <label for="password-confirm" class="block text-sm font-medium text-slate-200">
+              Confirmation
+              <span class="font-semibold text-red-300" aria-hidden="true">*</span>
+            </label>
             <input
-              class="mt-1.5 h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              id="password-confirm"
+              class="settings-field h-11 w-full rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
               type="password"
               formControlName="password_confirmation"
               autocomplete="new-password"
+              [attr.aria-required]="true"
               [attr.aria-invalid]="
-                fieldError(passwordForm.controls.password_confirmation) ? 'true' : null
+                fieldError(passwordForm.controls.password_confirmation) || confirmationError()
+                  ? 'true'
+                  : null
               "
               [attr.aria-describedby]="
-                fieldError(passwordForm.controls.password_confirmation)
+                fieldError(passwordForm.controls.password_confirmation) || confirmationError()
                   ? 'password-confirm-error'
                   : null
               "
             />
-          </label>
-          @if (fieldError(passwordForm.controls.password_confirmation); as message) {
-            <p id="password-confirm-error" class="-mt-2 text-xs text-red-400">{{ message }}</p>
-          }
+            @if (fieldError(passwordForm.controls.password_confirmation); as message) {
+              <p id="password-confirm-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            } @else if (confirmationError(); as message) {
+              <p id="password-confirm-error" class="text-xs font-medium text-red-300" role="alert">
+                {{ message }}
+              </p>
+            }
+          </div>
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-800/60 px-5 py-2.5 text-sm font-semibold text-emerald-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-600/70 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/80 hover:bg-emerald-900/50 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#153322] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             [disabled]="savingPassword()"
           >
             @if (savingPassword()) {

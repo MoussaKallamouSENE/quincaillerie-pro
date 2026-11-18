@@ -90,6 +90,19 @@ describe('SettingsService', () => {
     request.flush({ settings: company, message: 'Logo enregistré.' });
   });
 
+  it('récupère le logo de l’entreprise en blob', () => {
+    service.getLogo().subscribe((blob) => {
+      expect(blob).toBeInstanceOf(Blob);
+      expect(blob.type).toBe('image/png');
+    });
+
+    const request = httpMock.expectOne(`${baseUrl}/settings/company/logo`);
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.responseType).toBe('blob');
+    request.flush(new Blob(['logo'], { type: 'image/png' }));
+  });
+
   it('récupère le profil de l’utilisateur', () => {
     const user = {
       id: 1,

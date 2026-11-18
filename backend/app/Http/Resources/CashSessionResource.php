@@ -32,7 +32,10 @@ class CashSessionResource extends JsonResource
             'cash_received' => $this->money($this->cashReceived()),
             // Depenses payees en especes pendant la session.
             'expenses_total' => $this->money($this->expensesPaid()),
-            // Solde theorique du tiroir : fond de caisse + especes - depenses.
+            // Remboursements payes en especes pendant la session.
+            'refunds_total' => $this->money($this->refundsPaid()),
+            // Solde theorique du tiroir : fond de caisse + especes - depenses
+            // - remboursements.
             // Fige a la cloture pour une session close : une depense
             // enregistree apres coup ne modifie plus l'historique de caisse.
             'expected_cash' => $this->money($this->expectedCash()),

@@ -20,7 +20,10 @@
     $statusLabel = $statusLabels[$sale->payment_status] ?? $sale->payment_status;
     $customerName = $sale->customer?->name ?? 'Client de passage';
     $paidAmount = $sale->paidAmount();
+    $pendingAmount = $sale->pendingAmount();
     $balanceDue = $sale->balanceDue();
+    $confirmedPayments = $sale->payments->where('status', 'confirmed');
+    $pendingPayments = $sale->payments->where('status', 'pending');
 @endphp
 
 <!DOCTYPE html>
@@ -209,8 +212,22 @@
             color: #047857;
         }
 
+        .pending-row td {
+            color: #b45309;
+            font-weight: bold;
+        }
+
         .balance-row td {
             color: #b91c1c;
+            font-weight: bold;
+        }
+
+        .pending-note {
+            border: 1px solid #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+            padding: 10px 12px;
+            margin-top: 10px;
             font-weight: bold;
         }
 
@@ -355,6 +372,12 @@
                             <td class="totals-amount">{{ $money($paidAmount) }}</td>
                         </tr>
                     @endif
+                    @if ($pendingAmount > 0)
+                        <tr class="pending-row">
+                            <td class="totals-label">En attente de vérification</td>
+                            <td class="totals-amount">{{ $money($pendingAmount) }}</td>
+                        </tr>
+                    @endif
                     @if ($balanceDue > 0)
                         <tr class="balance-row">
                             <td class="totals-label">Reste à payer</td>
@@ -366,10 +389,16 @@
         </tr>
     </table>
 
-    <h2 class="section-title">Modes de paiement</h2>
+    <h2 class="section-title">Paiements confirmés</h2>
 
-    @if ($sale->payments->isEmpty())
-        <p class="empty">Aucun paiement enregistré — vente à crédit.</p>
+    @if ($confirmedPayments->isEmpty())
+        <p class="empty">
+            @if ($pendingPayments->isEmpty())
+                Aucun paiement enregistré — vente à crédit.
+            @else
+                Aucun paiement confirmé pour le moment.
+            @endif
+        </p>
     @else
         <table class="payments">
             <thead>
@@ -381,7 +410,35 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($sale->payments as $payment)
+                @foreach ($confirmedPayments as $payment)
+                    <tr>
+                        <td>{{ $methodLabels[$payment->method] ?? $payment->method }}</td>
+                        <td>{{ $payment->reference ?: '—' }}</td>
+                        <td>{{ $payment->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                        <td class="col-money">{{ $money($payment->amount) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if ($pendingPayments->isNotEmpty())
+        <h2 class="section-title">Paiements en attente de vérification</h2>
+        <p class="pending-note">
+            Ces paiements ne sont pas comptabilisés dans le montant payé tant
+            qu’un responsable ne les a pas confirmés.
+        </p>
+        <table class="payments">
+            <thead>
+                <tr>
+                    <th>Mode</th>
+                    <th>Référence</th>
+                    <th>Date</th>
+                    <th class="col-money">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($pendingPayments as $payment)
                     <tr>
                         <td>{{ $methodLabels[$payment->method] ?? $payment->method }}</td>
                         <td>{{ $payment->reference ?: '—' }}</td>

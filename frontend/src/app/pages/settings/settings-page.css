@@ -12,3 +12,13 @@ textarea[aria-invalid='true']:focus {
   border-color: #f87171;
   box-shadow: 0 0 0 3px rgb(239 68 68 / 15%);
 }
+
+.settings-field:focus-visible {
+  outline: 2px solid #6ee7b7;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline-offset: 2px;
+}

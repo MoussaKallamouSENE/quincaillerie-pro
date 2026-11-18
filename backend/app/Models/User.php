@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -71,5 +72,40 @@ class User extends Authenticatable
     public function expenses()
     {
         return $this->hasMany(Expense::class);
+    }
+
+    public function refundsRequested(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'requested_by_id');
+    }
+
+    public function refundsApproved(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'approved_by_id');
+    }
+
+    public function refundsRejected(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'rejected_by_id');
+    }
+
+    public function refundsExecuted(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'executed_by_id');
+    }
+
+    public function refundsCancelled(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'cancelled_by_id');
+    }
+
+    public function refundsReconciled(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'reconciled_by_id');
+    }
+
+    public function refundDocumentsUploaded(): HasMany
+    {
+        return $this->hasMany(RefundDocument::class, 'uploaded_by_id');
     }
 }

@@ -288,6 +288,80 @@ class ReportsApiTest extends TestCase
             ->assertJsonPath('data.0.user.name', $user->name);
     }
 
+    public function test_report_search_matches_translated_statuses_and_movement_types(): void
+    {
+        $user = $this->authenticate();
+        $supplier = Supplier::factory()->create();
+        $openSession = CashSession::factory()->create(['user_id' => $user->id, 'status' => 'open']);
+        CashSession::factory()->closed()->create(['user_id' => $user->id]);
+
+        $paidSale = Sale::factory()->create([
+            'user_id' => $user->id, 'cash_session_id' => $openSession->id,
+            'payment_status' => 'paid', 'created_at' => now(),
+        ]);
+        Sale::factory()->credit()->create([
+            'user_id' => $user->id, 'cash_session_id' => $openSession->id,
+            'created_at' => now(),
+        ]);
+
+        $receivedPurchase = Purchase::forceCreate([
+            'supplier_id' => $supplier->id, 'user_id' => $user->id,
+            'reference' => 'PUR-STATUS-001', 'total_amount' => 4000, 'status' => 'received',
+            'created_at' => now(), 'received_at' => now(),
+        ]);
+        Purchase::forceCreate([
+            'supplier_id' => $supplier->id, 'user_id' => $user->id,
+            'reference' => 'PUR-STATUS-002', 'total_amount' => 5000, 'status' => 'pending',
+            'created_at' => now(), 'received_at' => null,
+        ]);
+
+        $product = Product::factory()->create();
+        $entry = StockMovement::forceCreate([
+            'product_id' => $product->id, 'user_id' => $user->id,
+            'type' => 'in', 'quantity' => 5, 'reference' => 'MVT-STATUS-IN',
+            'created_at' => now(),
+        ]);
+        StockMovement::forceCreate([
+            'product_id' => $product->id, 'user_id' => $user->id,
+            'type' => 'out', 'quantity' => -2, 'reference' => 'MVT-STATUS-OUT',
+            'created_at' => now(),
+        ]);
+
+        $cashIn = CashMovement::query()->create([
+            'cash_session_id' => $openSession->id, 'user_id' => $user->id,
+            'type' => 'in', 'amount' => 2000, 'reason' => 'Fond de caisse',
+        ]);
+        CashMovement::query()->create([
+            'cash_session_id' => $openSession->id, 'user_id' => $user->id,
+            'type' => 'out', 'amount' => 500, 'reason' => 'Achat fournitures',
+        ]);
+
+        $this->getJson('/api/reports/sales?period=today&search=payee')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $paidSale->id);
+
+        $this->getJson('/api/reports/purchases?period=today&search=receptionnee')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $receivedPurchase->id);
+
+        $this->getJson('/api/reports/stock_movements?period=today&search=entree')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $entry->id);
+
+        $this->getJson('/api/reports/cash_sessions?period=today&search=ouverte')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $openSession->id);
+
+        $this->getJson('/api/reports/cash_movements?period=today&search=entree')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $cashIn->id);
+    }
+
     public function test_purchase_report_lists_orders_by_creation_date_and_exposes_received_date(): void
     {
         $this->authenticate();
@@ -332,6 +406,10 @@ class ReportsApiTest extends TestCase
         $this->get('/api/reports/customers/pdf?period=today')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+
+        $this->get('/api/reports/stock/pdf?period=today')
+            ->assertOk()
+            ->assertDownload('rapport-stock-etat-actuel.pdf');
     }
 
     public function test_unknown_report_type_is_rejected(): void

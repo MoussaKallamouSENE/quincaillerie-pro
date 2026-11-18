@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use App\Services\SaleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -155,6 +156,154 @@ class SaleApiTest extends TestCase
         $this->assertDatabaseCount('payments', 1);
         $this->assertDatabaseHas('products', ['id' => $product->id, 'stock_quantity' => 8]);
         $this->assertDatabaseCount('stock_movements', 1);
+    }
+
+    public function test_replaying_a_sale_key_with_different_data_is_rejected(): void
+    {
+        $user = $this->authenticate();
+        $this->openCashSession($user);
+        $product = $this->product(['stock_quantity' => 10]);
+
+        $first = $this->postJson('/api/sales', $this->payload($product, 2, [
+            'idempotency_key' => 'sale-conflict-0001',
+        ]))->assertCreated();
+
+        $this->postJson('/api/sales', $this->payload($product, 3, [
+            'idempotency_key' => 'sale-conflict-0001',
+        ]))
+            ->assertConflict()
+            ->assertJsonPath('code', 'idempotency_key_conflict');
+
+        $sale = Sale::query()->findOrFail($first->json('data.id'));
+
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $sale->idempotency_fingerprint);
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertDatabaseCount('sale_items', 1);
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'stock_quantity' => 8]);
+    }
+
+    public function test_replaying_a_sale_key_with_an_explicit_catalogue_price_is_rejected(): void
+    {
+        $user = $this->authenticate();
+        $this->openCashSession($user);
+        $product = $this->product(['sale_price' => 1000]);
+
+        $this->postJson('/api/sales', $this->payload($product, 1, [
+            'idempotency_key' => 'sale-explicit-price-0001',
+        ]))->assertCreated();
+
+        $this->postJson('/api/sales', $this->payload($product, 1, [
+            'idempotency_key' => 'sale-explicit-price-0001',
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 1000],
+            ],
+        ]))
+            ->assertConflict()
+            ->assertJsonPath('code', 'idempotency_key_conflict');
+
+        $this->assertDatabaseCount('sales', 1);
+    }
+
+    public function test_sale_idempotency_keys_are_normalized_for_retries(): void
+    {
+        $user = $this->authenticate();
+        $this->openCashSession($user);
+        $product = $this->product();
+
+        $first = $this->postJson('/api/sales', $this->payload($product, 1, [
+            'idempotency_key' => '  Caisse-Été-0001  ',
+        ]))->assertCreated();
+
+        $second = $this->postJson('/api/sales', $this->payload($product, 1, [
+            'idempotency_key' => 'caisse-ete-0001',
+        ]))->assertCreated();
+
+        $second->assertJsonPath('data.id', $first->json('data.id'));
+
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertDatabaseHas('sales', [
+            'id' => $first->json('data.id'),
+            'idempotency_key' => 'caisse-ete-0001',
+        ]);
+    }
+
+    public function test_sale_fingerprints_normalize_payment_references(): void
+    {
+        $user = $this->authenticate();
+        $this->openCashSession($user);
+        $product = $this->product();
+        $customer = Customer::factory()->create();
+
+        $first = $this->postJson('/api/sales', $this->payload($product, 1, [
+            'customer_id' => $customer->id,
+            'idempotency_key' => 'sale-reference-fold-0001',
+            'payment' => [
+                'method' => 'wave',
+                'amount' => 1000,
+                'reference' => '  WAVE-Café-001  ',
+            ],
+        ]))->assertCreated();
+
+        $second = $this->postJson('/api/sales', $this->payload($product, 1, [
+            'customer_id' => $customer->id,
+            'idempotency_key' => 'sale-reference-fold-0001',
+            'payment' => [
+                'method' => 'wave',
+                'amount' => 1000,
+                'reference' => 'wave-cafe-001',
+            ],
+        ]))->assertCreated();
+
+        $second->assertJsonPath('data.id', $first->json('data.id'));
+
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('payments', [
+            'sale_id' => $first->json('data.id'),
+            'reference' => 'WAVE-Café-001',
+        ]);
+    }
+
+    public function test_a_legacy_sale_without_fingerprint_returns_the_existing_sale_with_a_warning(): void
+    {
+        $user = $this->authenticate();
+        $product = $this->product(['stock_quantity' => 10]);
+
+        $legacy = Sale::factory()->create([
+            'user_id' => $user->id,
+            'idempotency_key' => 'Legacy-Été-Key-0001',
+            'idempotency_fingerprint' => null,
+            'total_amount' => 1000,
+            'payment_status' => 'paid',
+        ]);
+
+        $response = $this->postJson('/api/sales', $this->payload($product, 2, [
+            'idempotency_key' => 'legacy-ete-key-0001',
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.id', $legacy->id)
+            ->assertJsonPath('data.idempotency_warning', SaleService::WARNING_LEGACY_SALE);
+
+        $legacy->refresh();
+
+        $this->assertNull($legacy->idempotency_fingerprint);
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'stock_quantity' => 10]);
+    }
+
+    public function test_a_normalized_idempotency_key_must_fit_the_storage_column(): void
+    {
+        $user = $this->authenticate();
+        $this->openCashSession($user);
+        $product = $this->product();
+
+        $this->postJson('/api/sales', $this->payload($product, 1, [
+            'idempotency_key' => str_repeat('ß', 64),
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['idempotency_key']);
+
+        $this->assertDatabaseCount('sales', 0);
     }
 
     public function test_an_absent_idempotency_key_still_allows_two_distinct_sales(): void
@@ -573,13 +722,19 @@ class SaleApiTest extends TestCase
         $this->openCashSession($user);
 
         $product = $this->product();
+        $customer = Customer::factory()->create();
 
         $this->postJson('/api/sales', $this->payload($product, 1, [
+            'customer_id' => $customer->id,
             'payment' => ['method' => 'orange_money', 'amount' => 1000, 'reference' => 'OM-778899'],
         ]))
             ->assertCreated()
             ->assertJsonPath('data.payments.0.method', 'orange_money')
-            ->assertJsonPath('data.payments.0.reference', 'OM-778899');
+            ->assertJsonPath('data.payments.0.reference', 'OM-778899')
+            ->assertJsonPath('data.payments.0.status', 'pending')
+            ->assertJsonPath('data.paid_amount', '0.00')
+            ->assertJsonPath('data.pending_amount', '1000.00')
+            ->assertJsonPath('data.payment_status', 'credit');
     }
 
     public function test_sales_are_listed_with_their_details(): void
@@ -853,14 +1008,27 @@ class SaleApiTest extends TestCase
             'method' => 'cash',
         ]);
 
-        $this->postJson("/api/sales/{$saleId}/payments", [
+        $pending = $this->postJson("/api/sales/{$saleId}/payments", [
             'amount' => 1000,
             'method' => 'wave',
             'reference' => 'WAVE-0001',
         ])
             ->assertCreated()
+            ->assertJsonPath('data.payment_status', 'partial')
+            ->assertJsonPath('data.paid_amount', '2000.00')
+            ->assertJsonPath('data.pending_amount', '1000.00')
+            ->assertJsonPath('data.balance_due', '1000.00');
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'outstanding_balance' => 1000,
+        ]);
+
+        $this->postJson('/api/manual-payments/'.$pending->json('data.payments.1.id').'/confirm')
+            ->assertOk()
             ->assertJsonPath('data.payment_status', 'paid')
             ->assertJsonPath('data.paid_amount', '3000.00')
+            ->assertJsonPath('data.pending_amount', '0.00')
             ->assertJsonPath('data.balance_due', '0.00');
 
         $this->assertDatabaseHas('customers', [

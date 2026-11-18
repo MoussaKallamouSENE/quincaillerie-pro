@@ -37,7 +37,7 @@ class SaleController extends Controller
         $search = trim($request->string('search')->toString());
 
         $sales = Sale::query()
-            ->with(['customer', 'user', 'items.product', 'payments'])
+            ->with(['customer', 'user', 'items.product', 'payments.confirmedBy', 'payments.rejectedBy'])
             ->when($search !== '', function (Builder $query) use ($search) {
                 $query->where(function (Builder $query) use ($search) {
                     $query->where('reference', 'like', "%{$search}%")
@@ -69,7 +69,7 @@ class SaleController extends Controller
     public function show(int $sale): JsonResponse
     {
         $model = Sale::query()
-            ->with(['customer', 'user', 'items.product', 'payments'])
+            ->with(['customer', 'user', 'items.product', 'payments.confirmedBy', 'payments.rejectedBy'])
             ->findOrFail($sale);
 
         return SaleResource::make($model)->response();
@@ -85,7 +85,7 @@ class SaleController extends Controller
     public function downloadInvoice(Request $request, int $sale): Response
     {
         $model = Sale::query()
-            ->with(['customer', 'user', 'items.product', 'payments'])
+            ->with(['customer', 'user', 'items.product', 'payments.confirmedBy', 'payments.rejectedBy'])
             ->findOrFail($sale);
 
         $user = $request->user();

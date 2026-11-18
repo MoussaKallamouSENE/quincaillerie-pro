@@ -48,6 +48,7 @@ export type ReportRow = Record<string, unknown>;
 
 export interface ReportPage {
   type: ReportType | string;
+  period?: { from: string; to: string };
   data: ReportRow[];
   meta: { current_page: number; last_page: number; per_page: number; total: number };
 }

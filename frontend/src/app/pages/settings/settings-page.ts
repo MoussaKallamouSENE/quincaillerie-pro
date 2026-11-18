@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -26,8 +26,12 @@ export class SettingsPage {
   );
   protected readonly loading = signal(true);
   protected readonly companyLoading = signal(false);
+  protected readonly companyLoaded = signal(false);
+  protected readonly companyLoadFailed = signal(false);
   protected readonly savingCompany = signal(false);
   protected readonly uploadingLogo = signal(false);
+  protected readonly logoLoading = signal(false);
+  protected readonly logoPreviewFailed = signal(false);
   protected readonly savingProfile = signal(false);
   protected readonly savingPassword = signal(false);
   protected readonly companyError = signal<string | null>(null);
@@ -36,6 +40,8 @@ export class SettingsPage {
   protected readonly logoName = signal<string | null>(null);
   protected readonly logoPreviewUrl = signal<string | null>(null);
   protected readonly logoStored = signal(false);
+  private companyRequested = false;
+  private logoRequestVersion = 0;
 
   protected readonly companyForm = this.formBuilder.nonNullable.group({
     business_name: ['', [Validators.required, Validators.maxLength(160)]],
@@ -56,28 +62,18 @@ export class SettingsPage {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.clearLogoPreview());
+    this.destroyRef.onDestroy(() => {
+      this.logoRequestVersion += 1;
+      this.clearLogoPreview();
+    });
 
-    if (this.isAdmin()) {
-      this.companyLoading.set(true);
-      this.api
-        .getCompany()
-        .pipe(
-          takeUntilDestroyed(this.destroyRef),
-          finalize(() => this.companyLoading.set(false)),
-        )
-        .subscribe({
-          next: ({ settings }) => {
-            this.companyForm.patchValue(settings);
-            this.logoStored.set(Boolean(settings.logo_path));
-          },
-          error: (error: unknown) => {
-            this.companyError.set(
-              extractErrorMessage(error, 'Impossible de charger les paramètres entreprise.'),
-            );
-          },
-        });
-    }
+    effect(() => {
+      if (!this.isAdmin()) {
+        return;
+      }
+
+      untracked(() => this.loadCompany());
+    });
 
     this.api
       .getProfile()
@@ -94,6 +90,84 @@ export class SettingsPage {
         error: (error: unknown) => {
           this.profileError.set(extractErrorMessage(error, 'Impossible de charger le profil.'));
           this.loading.set(false);
+        },
+      });
+  }
+
+  private loadCompany(force = false): void {
+    if (this.companyRequested && !force) {
+      return;
+    }
+
+    this.companyRequested = true;
+    this.companyLoading.set(true);
+    this.companyLoadFailed.set(false);
+    this.companyError.set(null);
+
+    this.api
+      .getCompany()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.companyLoading.set(false);
+          this.companyLoaded.set(true);
+        }),
+      )
+      .subscribe({
+        next: ({ settings }) => {
+          this.companyForm.patchValue(settings);
+          this.logoStored.set(Boolean(settings.logo_path));
+
+          if (settings.logo_path) {
+            this.loadStoredLogo();
+          }
+        },
+        error: (error: unknown) => {
+          this.companyLoadFailed.set(true);
+          this.companyError.set(
+            extractErrorMessage(error, 'Impossible de charger les paramètres entreprise.'),
+          );
+        },
+      });
+  }
+
+  protected retryCompany(): void {
+    if (!this.companyLoading()) {
+      this.loadCompany(true);
+    }
+  }
+
+  private loadStoredLogo(): void {
+    const version = ++this.logoRequestVersion;
+    this.logoLoading.set(true);
+    this.logoPreviewFailed.set(false);
+
+    this.api
+      .getLogo()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (version === this.logoRequestVersion) {
+            this.logoLoading.set(false);
+          }
+        }),
+      )
+      .subscribe({
+        next: (blob) => {
+          if (version !== this.logoRequestVersion) {
+            return;
+          }
+
+          this.clearLogoPreview();
+
+          if (typeof URL.createObjectURL === 'function') {
+            this.logoPreviewUrl.set(URL.createObjectURL(blob));
+          }
+        },
+        error: () => {
+          if (version === this.logoRequestVersion) {
+            this.logoPreviewFailed.set(true);
+          }
         },
       });
   }
@@ -120,6 +194,20 @@ export class SettingsPage {
     }
 
     return 'Valeur invalide.';
+  }
+
+  protected confirmationError(): string | null {
+    const control = this.passwordForm.controls.password_confirmation;
+
+    if (!(control.touched || control.dirty) || control.value === '') {
+      return null;
+    }
+
+    const values = this.passwordForm.getRawValue();
+
+    return values.password === values.password_confirmation
+      ? null
+      : 'La confirmation ne correspond pas.';
   }
 
   protected saveCompany(): void {
@@ -170,8 +258,11 @@ export class SettingsPage {
       return;
     }
 
+    this.logoRequestVersion += 1;
+    this.logoLoading.set(false);
     this.clearLogoPreview();
     this.logoName.set(file.name);
+    this.logoPreviewFailed.set(false);
     this.companyError.set(null);
 
     if (typeof URL.createObjectURL === 'function') {
@@ -198,8 +289,17 @@ export class SettingsPage {
           this.clearLogoPreview();
           this.logoName.set(null);
           this.companyError.set(extractErrorMessage(error, 'Téléversement du logo impossible.'));
+
+          if (this.logoStored()) {
+            this.loadStoredLogo();
+          }
         },
       });
+  }
+
+  protected handleLogoPreviewError(): void {
+    this.logoPreviewFailed.set(true);
+    this.clearLogoPreview();
   }
 
   private clearLogoPreview(): void {
@@ -251,7 +351,7 @@ export class SettingsPage {
       return;
     }
     if (values.password !== values.password_confirmation) {
-      this.passwordError.set('La confirmation ne correspond pas.');
+      this.passwordForm.controls.password_confirmation.markAsTouched();
       return;
     }
     this.savingPassword.set(true);

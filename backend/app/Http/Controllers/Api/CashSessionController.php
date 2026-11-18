@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exceptions\CashSessionAlreadyOpenException;
+use App\Exceptions\CashSessionHasRunningRefundException;
 use App\Exceptions\NoOpenCashSessionException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CloseCashSessionRequest;
@@ -10,6 +11,7 @@ use App\Http\Requests\OpenCashSessionRequest;
 use App\Http\Resources\CashSessionResource;
 use App\Models\CashSession;
 use App\Models\User;
+use App\Services\CashSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CashSessionController extends Controller
 {
+    public function __construct(private readonly CashSessionService $cashSessionService) {}
+
     /**
      * Open a cash session for the authenticated user.
      *
@@ -28,17 +32,22 @@ class CashSessionController extends Controller
     public function open(OpenCashSessionRequest $request): JsonResponse
     {
         $cashSession = DB::transaction(function () use ($request): CashSession {
-            // Lock the existing parent row so concurrent attempts for the same
-            // user are serialized even when no open session row exists yet.
+            $userId = (int) $request->user()->getAuthIdentifier();
+
+            // L'utilisateur serialise les ouvertures concurrentes. Aucun
+            // verrou n'est pris sur cash_sessions : une execution especes
+            // verrouille la session puis l'utilisateur, donc attendre une
+            // session tout en tenant l'utilisateur creerait un cycle.
             $user = User::query()
-                ->whereKey($request->user()->getAuthIdentifier())
+                ->whereKey($userId)
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Relecture sans verrou : le verrou utilisateur garantit qu'aucune
+            // autre ouverture ne peut creer de session entre-temps.
             $existing = CashSession::query()
                 ->where('user_id', $user->id)
                 ->where('status', 'open')
-                ->lockForUpdate()
                 ->first();
 
             if ($existing instanceof CashSession) {
@@ -63,43 +72,20 @@ class CashSessionController extends Controller
      *
      * The counted amount is stored on the session, its status becomes "closed"
      * and its closing time is recorded. The theoretical cash of the drawer
-     * (opening balance + cash sales - expenses) is frozen at this exact
-     * moment, so a later expense cannot rewrite the history of the session.
-     * The resource exposes the difference between the counted cash and that
-     * theoretical cash.
+     * (opening balance + cash sales - expenses - cash refunds) is frozen at
+     * this exact moment, so a later expense cannot rewrite the history of the
+     * session. The resource exposes the difference between the counted cash
+     * and that theoretical cash.
      *
      * @throws NoOpenCashSessionException
+     * @throws CashSessionHasRunningRefundException
      */
     public function close(CloseCashSessionRequest $request): JsonResponse
     {
-        $cashSession = DB::transaction(function () use ($request): CashSession {
-            $user = $request->user();
-
-            // The row is locked so that two concurrent closings cannot both
-            // close the same session and record two different counts.
-            $cashSession = CashSession::query()
-                ->where('user_id', $user->id)
-                ->where('status', 'open')
-                ->lockForUpdate()
-                ->first();
-
-            if (! $cashSession instanceof CashSession) {
-                throw new NoOpenCashSessionException;
-            }
-
-            // Theoretical balance of the drawer, frozen at closing time:
-            // opening balance + cash sales - expenses.
-            // The balance is written on the session, so an expense recorded
-            // later cannot rewrite the history of the closed session.
-            $cashSession->expected_cash = $cashSession->computeExpectedCash();
-
-            $cashSession->closing_balance = $request->validated('closing_balance');
-            $cashSession->closed_at = now();
-            $cashSession->status = 'closed';
-            $cashSession->save();
-
-            return $cashSession;
-        });
+        $cashSession = $this->cashSessionService->closeFor(
+            $request->user(),
+            (float) $request->validated('closing_balance'),
+        );
 
         return CashSessionResource::make($cashSession)
             ->response()

@@ -472,6 +472,29 @@
               </p>
             }
           </div>
+
+          @if (requiresPaymentReference()) {
+            <div class="mt-3">
+              <label
+                for="pos-payment-reference"
+                class="mb-1.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase"
+              >
+                Référence de transaction <span class="text-red-400">*</span>
+              </label>
+              <input
+                id="pos-payment-reference"
+                type="text"
+                maxlength="255"
+                [value]="paymentReference()"
+                (input)="onPaymentReference($event)"
+                placeholder="Référence Wave ou Orange Money"
+                class="w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+              <p class="mt-1.5 text-xs text-amber-300">
+                Le paiement sera enregistré comme « En attente de vérification ».
+              </p>
+            </div>
+          }
         } @else {
           <p
             class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
@@ -846,6 +869,16 @@
           </div>
         }
       </dl>
+
+      @if (completed.sale.pending_amount !== '0.00') {
+        <div class="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <p class="font-semibold">Paiement en attente de vérification</p>
+          <p class="mt-1">
+            {{ completed.sale.pending_amount | number: '1.2-2' }} FCFA doivent être confirmés par un
+            administrateur ou un gérant avant d’être comptés comme payés.
+          </p>
+        </div>
+      }
 
       <div class="mt-5 flex flex-col gap-2">
         <button

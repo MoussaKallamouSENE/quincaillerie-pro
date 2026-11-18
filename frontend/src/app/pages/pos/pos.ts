@@ -225,6 +225,14 @@ export class Pos {
   /** Mode de paiement selectionne. */
   protected readonly paymentMethod = signal<PaymentMethod>('cash');
 
+  /** Reference de transaction saisie pour Wave ou Orange Money. */
+  protected readonly paymentReference = signal('');
+
+  /** Vrai quand le mode de paiement exige une reference de transaction. */
+  protected readonly requiresPaymentReference = computed(() =>
+    ['wave', 'orange_money'].includes(this.paymentMethod()),
+  );
+
   /**
    * Montant recu par le client.
    *
@@ -256,13 +264,27 @@ export class Pos {
     return Math.min(this.receivedAmount(), this.cartTotal());
   });
 
-  /** Monnaie a rendre au client. */
-  protected readonly changeDue = computed(() =>
-    Math.max(0, this.receivedAmount() - this.cartTotal()),
-  );
+  /** Monnaie a rendre au client, uniquement pour un paiement en especes. */
+  protected readonly changeDue = computed(() => {
+    if (this.paymentMethod() !== 'cash') {
+      return 0;
+    }
+
+    return Math.max(0, this.receivedAmount() - this.cartTotal());
+  });
 
   /** Reliquat de la vente, reporte sur la dette du client. */
   protected readonly dueAmount = computed(() => Math.max(0, this.cartTotal() - this.paidAmount()));
+
+  /**
+   * Vrai quand la vente exige un client.
+   *
+   * Un paiement Wave ou Orange Money reste en attente : meme s'il couvre le
+   * total, la vente demeure a credit jusqu'a sa confirmation.
+   */
+  protected readonly requiresCustomer = computed(
+    () => this.dueAmount() > 0 || (this.requiresPaymentReference() && this.paidAmount() > 0),
+  );
 
   /** Vrai quand la modale bloquante d'ouverture doit etre affichee. */
   protected readonly needsOpening = computed(
@@ -451,6 +473,7 @@ export class Pos {
   /** Vide le panier. */
   protected clearCart(): void {
     this.cart.set([]);
+    this.paymentReference.set('');
     this.saleError.set(null);
     this.saleIdempotencyKey.set(null);
   }
@@ -459,6 +482,7 @@ export class Pos {
   protected onSelectPaymentMethod(method: PaymentMethod): void {
     this.paymentMethod.set(method);
     this.receivedAmount.set(method === 'credit' ? 0 : this.cartTotal());
+    this.paymentReference.set('');
     this.saleIdempotencyKey.set(null);
   }
 
@@ -478,12 +502,18 @@ export class Pos {
     this.saleIdempotencyKey.set(null);
   }
 
+  /** Met a jour la reference de transaction. */
+  protected onPaymentReference(event: Event): void {
+    this.paymentReference.set((event.target as HTMLInputElement).value);
+    this.saleIdempotencyKey.set(null);
+  }
+
   /**
    * Enregistre la vente.
    *
-   * Les regles controlees ici sont celles du backend : une vente a credit ou
-   * partielle exige un client, et le montant regle ne peut pas depasser le
-   * total.
+   * Les regles controlees ici sont celles du backend : une vente a credit,
+   * partielle ou reglee par un paiement manuel en attente exige un client, et
+   * le montant regle ne peut pas depasser le total.
    */
   protected onValidateSale(): void {
     if (this.submitting()) {
@@ -498,10 +528,32 @@ export class Pos {
       return;
     }
 
+    if (this.requiresPaymentReference() && this.receivedAmount() <= 0) {
+      this.saleError.set('Le montant reçu doit être supérieur à zéro pour Wave et Orange Money.');
+
+      return;
+    }
+
+    const paid = this.paidAmount();
+    const reference = this.paymentReference().trim();
+
+    if (this.paymentMethod() !== 'credit'
+      && paid > 0
+      && this.requiresPaymentReference()
+      && reference === '') {
+      this.saleError.set(
+        'La référence de transaction est obligatoire pour Wave et Orange Money.',
+      );
+
+      return;
+    }
+
     const customerId = this.selectedCustomerId();
 
-    if (this.dueAmount() > 0 && customerId === null) {
-      this.saleError.set('Sélectionnez un client pour une vente partielle ou à crédit.');
+    if (this.requiresCustomer() && customerId === null) {
+      this.saleError.set(
+        'Sélectionnez un client pour une vente partielle, à crédit ou avec un paiement Wave/Orange Money en attente.',
+      );
 
       return;
     }
@@ -512,12 +564,14 @@ export class Pos {
       idempotency_key: this.idempotencyKeyForAttempt(),
     };
 
-    const paid = this.paidAmount();
-
     // La vente entierement a credit n'a pas de paiement : c'est le backend
     // qui reporte le total sur la dette du client.
     if (this.paymentMethod() !== 'credit' && paid > 0) {
-      payload.payment = { method: this.paymentMethod(), amount: paid };
+      payload.payment = {
+        method: this.paymentMethod(),
+        amount: paid,
+        reference: reference || undefined,
+      };
     }
 
     this.submitting.set(true);
@@ -533,14 +587,19 @@ export class Pos {
           this.submitting.set(false);
           this.cart.set([]);
           this.selectedCustomerId.set(null);
+          this.paymentReference.set('');
           this.onSelectPaymentMethod('cash');
           this.saleError.set(null);
           this.saleIdempotencyKey.set(null);
 
+          const pending = Number(sale.pending_amount) > 0;
+
           this.toastService.success(
-            change > 0
-              ? `Vente ${sale.reference} enregistrée — monnaie à rendre : ${formatMoney(change)}.`
-              : `Vente ${sale.reference} enregistrée avec succès.`,
+            pending
+              ? `Vente ${sale.reference} enregistrée — paiement en attente de vérification.`
+              : change > 0
+                ? `Vente ${sale.reference} enregistrée — monnaie à rendre : ${formatMoney(change)}.`
+                : `Vente ${sale.reference} enregistrée avec succès.`,
           );
 
           // La modale de succes propose d'imprimer la facture tout de suite.

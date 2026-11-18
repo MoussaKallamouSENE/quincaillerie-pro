@@ -151,4 +151,48 @@ class SaleInvoiceTest extends TestCase
 
         $this->assertStringContainsString('Client de passage', $html);
     }
+
+    public function test_the_invoice_distinguishes_pending_payments_from_confirmed_payments(): void
+    {
+        $sale = $this->createSale(['payment_status' => 'credit'], withPayment: false);
+
+        $sale->payments()->create([
+            'user_id' => $sale->user_id,
+            'amount' => 1000,
+            'method' => 'wave',
+            'reference' => 'WAVE-INVOICE-1',
+            'status' => 'pending',
+        ]);
+
+        $html = view('pdf.invoice', ['sale' => $sale->load(['customer', 'user', 'items.product', 'payments'])])->render();
+
+        $this->assertStringContainsString('Aucun paiement confirmé', $html);
+        $this->assertStringContainsString('Paiements en attente de vérification', $html);
+        $this->assertStringContainsString('WAVE-INVOICE-1', $html);
+        $this->assertStringContainsString('En attente de vérification', $html);
+        $this->assertStringContainsString('Reste à payer', $html);
+        $this->assertStringNotContainsString('>Payé<', $html);
+    }
+
+    public function test_the_invoice_does_not_count_a_rejected_payment_as_paid(): void
+    {
+        $sale = $this->createSale(['payment_status' => 'credit'], withPayment: false);
+
+        $sale->payments()->create([
+            'user_id' => $sale->user_id,
+            'amount' => 2500,
+            'method' => 'orange_money',
+            'reference' => 'OM-INVOICE-REJECTED',
+            'status' => 'rejected',
+            'rejection_reason' => 'Référence introuvable.',
+        ]);
+
+        $html = view('pdf.invoice', ['sale' => $sale->load(['customer', 'user', 'items.product', 'payments'])])->render();
+
+        $this->assertStringContainsString('Aucun paiement enregistré', $html);
+        $this->assertStringContainsString('Reste à payer', $html);
+        $this->assertStringNotContainsString('OM-INVOICE-REJECTED', $html);
+        $this->assertStringNotContainsString('>Payé<', $html);
+        $this->assertStringNotContainsString('Paiements en attente de vérification', $html);
+    }
 }

@@ -18,6 +18,9 @@ export class SettingsService {
     const form = new FormData(); form.append('logo', file);
     return this.http.post<{ settings: CompanySettings; message: string }>(`${this.baseUrl}/settings/company/logo`, form);
   }
+  getLogo(): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/settings/company/logo`, { responseType: 'blob' });
+  }
   getProfile(): Observable<{ user: Pick<AuthUser, 'id' | 'name' | 'email'> & { phone?: string | null } }> { return this.http.get<{ user: Pick<AuthUser, 'id' | 'name' | 'email'> & { phone?: string | null } }>(`${this.baseUrl}/profile`); }
   updateProfile(value: { name: string; email: string; phone: string }): Observable<{ user: AuthUser; message: string }> {
     return this.http.put<{ user: AuthUser; message: string }>(`${this.baseUrl}/profile`, value);

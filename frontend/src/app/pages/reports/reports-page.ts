@@ -41,6 +41,20 @@ const PER_PAGE = 25;
 /** Delai de stabilisation de la recherche, en millisecondes. */
 const SEARCH_DELAY = 350;
 
+/**
+ * Rapports qui présentent un état instantané et non une période.
+ *
+ * La période reste utile pour les indicateurs de synthèse, mais elle ne
+ * filtre pas les lignes de ces rapports.
+ */
+const PERIODLESS_REPORT_TYPES: ReadonlySet<ReportType> = new Set<ReportType>([
+  'stock',
+  'out_of_stock',
+  'low_stock',
+  'customers',
+  'suppliers',
+]);
+
 interface ChartPoint {
   readonly bucket: string;
   readonly label: string;
@@ -137,6 +151,11 @@ export class ReportsPage {
 
   protected readonly hasActiveSearch = computed(() => this.appliedSearch().trim() !== '');
 
+  /** Vrai si le rapport sélectionné est filtré par la période. */
+  protected readonly usesDatePeriod = computed(
+    () => !PERIODLESS_REPORT_TYPES.has(this.selectedType()),
+  );
+
   protected readonly hasActiveFilters = computed(
     () =>
       this.period() !== 'month' ||
@@ -168,7 +187,7 @@ export class ReportsPage {
   protected readonly customRangeInvalid = computed(() => this.customRangeError() !== null);
 
   protected readonly periodLabel = computed(() => {
-    const period = this.summary()?.period;
+    const period = this.summary()?.period ?? this.page()?.period;
 
     if (!period) {
       return '';
@@ -176,6 +195,11 @@ export class ReportsPage {
 
     return `du ${formatDate(period.from)} au ${formatDate(period.to)}`;
   });
+
+  /** Période affichée dans l'en-tête du tableau, ou « état actuel ». */
+  protected readonly tablePeriodLabel = computed(() =>
+    this.usesDatePeriod() ? this.periodLabel() : 'état actuel',
+  );
 
   protected readonly topProducts = computed(() => {
     const products = this.summary()?.top_products ?? [];
@@ -527,7 +551,11 @@ export class ReportsPage {
   }
 
   private pdfFileName(): string {
-    const period = this.summary()?.period;
+    if (!this.usesDatePeriod()) {
+      return `rapport-${this.selectedType()}-etat-actuel.pdf`;
+    }
+
+    const period = this.summary()?.period ?? this.page()?.period;
     const suffix = period ? `${period.from}_${period.to}` : this.period();
 
     return `rapport-${this.selectedType()}-${suffix}.pdf`;
@@ -567,8 +595,17 @@ function compactMoney(value: number): string {
     return `${(value / 1_000_000).toFixed(1).replace('.', ',')} M`;
   }
 
-  if (value >= 1_000) {
+  if (value >= 10_000) {
     return `${Math.round(value / 1_000)} k`;
+  }
+
+  if (value >= 1_000) {
+    const thousands = Math.round((value / 1_000) * 10) / 10;
+    const formatted = Number.isInteger(thousands)
+      ? thousands.toFixed(0)
+      : thousands.toFixed(1).replace('.', ',');
+
+    return `${formatted} k`;
   }
 
   return `${Math.round(value)}`;

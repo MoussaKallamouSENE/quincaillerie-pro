@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -33,6 +34,7 @@ describe('SettingsPage', () => {
     getCompany: ReturnType<typeof vi.fn>;
     saveCompany: ReturnType<typeof vi.fn>;
     uploadLogo: ReturnType<typeof vi.fn>;
+    getLogo: ReturnType<typeof vi.fn>;
     getProfile: ReturnType<typeof vi.fn>;
     updateProfile: ReturnType<typeof vi.fn>;
     changePassword: ReturnType<typeof vi.fn>;
@@ -48,10 +50,13 @@ describe('SettingsPage', () => {
     settingsApi = {
       getCompany: vi.fn().mockReturnValue(of({ settings: COMPANY_SETTINGS })),
       saveCompany: vi.fn().mockReturnValue(of({ message: 'Entreprise enregistrée.' })),
-      uploadLogo: vi.fn().mockReturnValue(of({
-        settings: COMPANY_SETTINGS,
-        message: 'Logo enregistré.',
-      })),
+      uploadLogo: vi.fn().mockReturnValue(
+        of({
+          settings: COMPANY_SETTINGS,
+          message: 'Logo enregistré.',
+        }),
+      ),
+      getLogo: vi.fn().mockReturnValue(of(new Blob(['logo'], { type: 'image/png' }))),
       getProfile: vi.fn().mockReturnValue(of({ user: PROFILE })),
       updateProfile: vi.fn().mockReturnValue(of({ message: 'Profil mis à jour.' })),
       changePassword: vi.fn().mockReturnValue(of({ message: 'Mot de passe modifié.' })),
@@ -108,6 +113,77 @@ describe('SettingsPage', () => {
     expect(page.loading()).toBe(false);
   });
 
+  it('should load company settings once the admin role becomes available', () => {
+    fixture.destroy();
+    settingsApi.getCompany.mockClear();
+
+    const adminRole = signal(false);
+    auth.hasRole.mockImplementation(() => adminRole());
+
+    const delayedFixture = TestBed.createComponent(SettingsPage);
+    delayedFixture.detectChanges();
+
+    expect(settingsApi.getCompany).not.toHaveBeenCalled();
+
+    adminRole.set(true);
+    delayedFixture.detectChanges();
+
+    expect(settingsApi.getCompany).toHaveBeenCalledOnce();
+    expect(delayedFixture.nativeElement.textContent).toContain('Entreprise et facturation');
+
+    delayedFixture.destroy();
+  });
+
+  it('should load the stored company logo when a logo path is present', () => {
+    fixture.destroy();
+    settingsApi.getCompany.mockReturnValue(
+      of({
+        settings: { ...COMPANY_SETTINGS, logo_path: 'company-logos/logo.png' },
+      }),
+    );
+
+    const logoFixture = TestBed.createComponent(SettingsPage);
+    logoFixture.detectChanges();
+
+    expect(settingsApi.getLogo).toHaveBeenCalledOnce();
+    expect(logoFixture.nativeElement.textContent).toContain('Logo actuel de l’entreprise.');
+
+    logoFixture.destroy();
+  });
+
+  it('should retry loading company settings after a failure', () => {
+    fixture.destroy();
+    settingsApi.getCompany.mockReset();
+    settingsApi.getCompany
+      .mockReturnValueOnce(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 500,
+              error: { message: 'Service indisponible.' },
+            }),
+        ),
+      )
+      .mockReturnValue(of({ settings: COMPANY_SETTINGS }));
+
+    const retryFixture = TestBed.createComponent(SettingsPage);
+    retryFixture.detectChanges();
+
+    expect(retryFixture.nativeElement.textContent).toContain('Service indisponible.');
+    expect(retryFixture.nativeElement.textContent).toContain('Réessayer');
+
+    const page = retryFixture.componentInstance as unknown as {
+      retryCompany: () => void;
+    };
+    page.retryCompany();
+    retryFixture.detectChanges();
+
+    expect(settingsApi.getCompany).toHaveBeenCalledTimes(2);
+    expect(retryFixture.nativeElement.textContent).not.toContain('Réessayer');
+
+    retryFixture.destroy();
+  });
+
   it('should display company settings and user management for an admin', () => {
     const html = fixture.nativeElement as HTMLElement;
 
@@ -147,13 +223,15 @@ describe('SettingsPage', () => {
 
   it('should save valid company settings and display a success message', () => {
     const page = fixture.componentInstance as unknown as {
-      companyForm: { setValue: (value: {
-        business_name: string;
-        phone: string;
-        email: string;
-        address: string;
-        invoice_footer: string;
-      }) => void };
+      companyForm: {
+        setValue: (value: {
+          business_name: string;
+          phone: string;
+          email: string;
+          address: string;
+          invoice_footer: string;
+        }) => void;
+      };
       saveCompany: () => void;
     };
 
@@ -198,13 +276,15 @@ describe('SettingsPage', () => {
 
   it('should reject a password when the confirmation does not match', () => {
     const page = fixture.componentInstance as unknown as {
-      passwordForm: { setValue: (value: {
-        current_password: string;
-        password: string;
-        password_confirmation: string;
-      }) => void };
+      passwordForm: {
+        setValue: (value: {
+          current_password: string;
+          password: string;
+          password_confirmation: string;
+        }) => void;
+      };
       changePassword: () => void;
-      passwordError: () => string | null;
+      confirmationError: () => string | null;
     };
 
     page.passwordForm.setValue({
@@ -214,18 +294,22 @@ describe('SettingsPage', () => {
     });
 
     page.changePassword();
+    fixture.detectChanges();
 
     expect(settingsApi.changePassword).not.toHaveBeenCalled();
-    expect(page.passwordError()).toBe('La confirmation ne correspond pas.');
+    expect(page.confirmationError()).toBe('La confirmation ne correspond pas.');
+    expect(fixture.nativeElement.textContent).toContain('La confirmation ne correspond pas.');
   });
 
   it('should change the password when the confirmation matches', () => {
     const page = fixture.componentInstance as unknown as {
-      passwordForm: { setValue: (value: {
-        current_password: string;
-        password: string;
-        password_confirmation: string;
-      }) => void };
+      passwordForm: {
+        setValue: (value: {
+          current_password: string;
+          password: string;
+          password_confirmation: string;
+        }) => void;
+      };
       changePassword: () => void;
       passwordFormValue: () => unknown;
     };
@@ -257,27 +341,42 @@ describe('SettingsPage', () => {
     page.chooseLogo(event);
 
     expect(settingsApi.uploadLogo).not.toHaveBeenCalled();
-    expect(page.companyError()).toBe(
-      'Choisissez une image PNG, JPEG ou WebP de 2 Mo maximum.',
-    );
+    expect(page.companyError()).toBe('Choisissez une image PNG, JPEG ou WebP de 2 Mo maximum.');
+  });
+
+  it('should upload a supported logo file', () => {
+    const page = fixture.componentInstance as unknown as {
+      chooseLogo: (event: Event) => void;
+    };
+
+    const input = document.createElement('input');
+    const file = new File(['image'], 'logo.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [file] });
+    const event = { target: input } as unknown as Event;
+
+    page.chooseLogo(event);
+
+    expect(settingsApi.uploadLogo).toHaveBeenCalledWith(file);
+    expect(toast.success).toHaveBeenCalledWith('Logo enregistré.');
   });
 
   it('should display an error when the profile cannot be loaded', () => {
     fixture.destroy();
 
     settingsApi.getProfile.mockReturnValue(
-      throwError(() => new HttpErrorResponse({
-        status: 500,
-        error: { message: 'Erreur de chargement du profil.' },
-      })),
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 500,
+            error: { message: 'Erreur de chargement du profil.' },
+          }),
+      ),
     );
 
     const errorFixture = TestBed.createComponent(SettingsPage);
     errorFixture.detectChanges();
 
-    expect(errorFixture.nativeElement.textContent).toContain(
-      'Erreur de chargement du profil.',
-    );
+    expect(errorFixture.nativeElement.textContent).toContain('Erreur de chargement du profil.');
 
     errorFixture.destroy();
   });

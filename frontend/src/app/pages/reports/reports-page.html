@@ -36,7 +36,7 @@
 
       <button
         type="button"
-        class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         [disabled]="exporting() || loading()"
         (click)="exportPdf()"
       >
@@ -62,7 +62,19 @@
   <div class="hidden print:mb-6 print:block print:border-b print:border-slate-300 print:pb-4">
     <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Quincaillerie Pro</p>
     <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ selectedLabel() }}</h1>
-    <p class="mt-1 text-sm text-slate-600">Période {{ periodLabel() }}</p>
+    <p class="mt-1 text-sm text-slate-600">
+      @if (usesDatePeriod()) {
+        Période {{ periodLabel() }}
+      } @else {
+        État actuel — hors période
+      }
+    </p>
+    @if (hasResults()) {
+      <p class="mt-2 text-xs text-slate-500">
+        Impression limitée à la page courante ({{ count(rows().length) }} ligne(s)). Pour le rapport
+        complet, utilisez « Exporter en PDF » (500 lignes maximum).
+      </p>
+    }
   </div>
 
   <section
@@ -154,7 +166,7 @@
               type="search"
               name="search"
               autocomplete="off"
-              placeholder="Référence, nom, téléphone…"
+              placeholder="Référence, nom, statut…"
               class="h-11 w-full rounded-lg border border-emerald-800/50 bg-emerald-950/40 pr-10 pl-10 text-sm text-slate-200 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               [ngModel]="searchTerm()"
               (ngModelChange)="onSearchChange($event)"
@@ -183,7 +195,7 @@
 
         <button
           type="submit"
-          class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2 xl:col-span-2"
+          class="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2 xl:col-span-2"
           [disabled]="loading()"
         >
           <svg
@@ -360,7 +372,7 @@
             <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
               {{ count(data.metrics.sales_count) }}
             </p>
-            <p class="mt-2 text-xs text-slate-400">Transactions sur la période</p>
+            <p class="mt-2 text-xs text-slate-400">Transactions enregistrées sur la période</p>
           </div>
           <span
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20"
@@ -393,7 +405,7 @@
               {{ money(data.metrics.received_purchases) }}
             </p>
             <p class="mt-2 text-xs text-slate-400">
-              {{ count(data.metrics.received_purchases_count) }} réception(s)
+              {{ count(data.metrics.received_purchases_count) }} réception(s) sur la période
             </p>
           </div>
           <span
@@ -426,7 +438,7 @@
             <p class="mt-2 break-words text-2xl font-semibold tracking-tight text-slate-100">
               {{ money(data.metrics.expenses) }}
             </p>
-            <p class="mt-2 text-xs text-slate-400">Sorties d’argent enregistrées</p>
+            <p class="mt-2 text-xs text-slate-400">Dépenses enregistrées sur la période</p>
           </div>
           <span
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-300 ring-1 ring-red-500/20"
@@ -451,24 +463,33 @@
     </section>
 
     @if (data.notes.length) {
-      <section
-        aria-labelledby="report-notes-title"
-        class="report-card rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm leading-6 text-amber-100/90 print:break-inside-avoid print:border-amber-300 print:bg-white print:text-slate-700"
+      <details
+        class="report-notes rounded-xl border border-emerald-700/40 bg-emerald-900/20 p-4 text-sm leading-6 text-emerald-100/90 print:hidden"
       >
-        <p id="report-notes-title" class="font-semibold text-amber-200 print:text-slate-900">
-          À propos des indicateurs
-        </p>
-        <ul class="mt-2 space-y-1.5">
+        <summary
+          class="flex cursor-pointer items-center justify-between gap-3 font-semibold text-emerald-200 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none"
+        >
+          <span>À propos des indicateurs</span>
+          <svg
+            class="report-notes-chevron h-4 w-4 shrink-0 text-emerald-300"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+          </svg>
+        </summary>
+        <ul class="mt-3 space-y-1.5">
           @for (note of data.notes; track note) {
             <li class="flex gap-2">
-              <span
-                class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400 print:bg-slate-500"
-              ></span>
+              <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-400"></span>
               <span>{{ note }}</span>
             </li>
           }
         </ul>
-      </section>
+      </details>
     }
 
     <section class="grid gap-5 xl:grid-cols-5">
@@ -667,160 +688,177 @@
     </section>
   }
 
-  <section
-    class="report-card overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30 print:border-slate-300"
-  >
-    <header
-      class="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/40 p-4 sm:p-5 print:border-slate-300"
+  @if (!reportError() || page()) {
+    <section
+      class="report-card overflow-hidden rounded-xl border border-emerald-800/50 bg-[#153322] shadow-lg shadow-emerald-950/30 print:border-slate-300"
     >
-      <div>
-        <h2 class="text-base font-semibold text-slate-100 print:text-slate-900">
-          {{ selectedLabel() }}
-        </h2>
-        <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
-          {{ count(meta()?.total ?? 0) }} résultat(s)
-          @if (periodLabel()) {
-            <span> · {{ periodLabel() }}</span>
-          }
-        </p>
-      </div>
-    </header>
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/40 p-4 sm:p-5 print:border-slate-300"
+      >
+        <div>
+          <h2 class="text-base font-semibold text-slate-100 print:text-slate-900">
+            {{ selectedLabel() }}
+          </h2>
+          <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
+            {{ count(meta()?.total ?? 0) }} résultat(s)
+            @if (tablePeriodLabel()) {
+              <span> · {{ tablePeriodLabel() }}</span>
+            }
+          </p>
+        </div>
+      </header>
 
-    @if (loading() && !page()) {
-      <div class="space-y-3 p-4 sm:p-5" aria-hidden="true">
-        @for (row of [1, 2, 3, 4, 5]; track row) {
-          <div class="h-11 animate-pulse rounded-lg bg-emerald-800/40"></div>
-        }
-      </div>
-    } @else if (hasResults()) {
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm" [style.min-width.px]="tableMinWidth()">
-          <caption class="sr-only">
-            {{
-              selectedLabel()
-            }}
-            —
-            {{
-              periodLabel()
-            }}
-          </caption>
-          <thead
-            class="bg-emerald-950/40 text-xs tracking-wide text-slate-400 uppercase print:bg-slate-100 print:text-slate-700"
-          >
-            <tr>
-              @for (column of columns(); track column.key; let columnIndex = $index) {
-                <th
-                  scope="col"
-                  class="px-4 py-3 font-semibold whitespace-nowrap"
-                  [class.text-right]="column.align === 'right'"
-                  [class.text-center]="column.align === 'center'"
-                >
-                  {{ column.label }}
-                </th>
-              }
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-emerald-800/30 print:divide-slate-300">
-            @for (row of rows(); track $index) {
-              <tr class="transition hover:bg-emerald-900/30 print:hover:bg-transparent">
+      <p
+        class="border-b border-emerald-800/30 px-4 py-2 text-xs text-slate-400 lg:hidden print:hidden"
+      >
+        Faites défiler horizontalement pour voir toutes les colonnes.
+      </p>
+
+      @if (loading() && !page()) {
+        <div class="space-y-3 p-4 sm:p-5" aria-hidden="true">
+          @for (row of [1, 2, 3, 4, 5]; track row) {
+            <div class="h-11 animate-pulse rounded-lg bg-emerald-800/40"></div>
+          }
+        </div>
+      } @else if (hasResults()) {
+        <div
+          class="overflow-x-auto focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none"
+          tabindex="0"
+          role="region"
+          [attr.aria-label]="'Tableau ' + selectedLabel()"
+        >
+          <table class="w-full text-left text-sm" [style.min-width.px]="tableMinWidth()">
+            <caption class="sr-only">
+              {{
+                selectedLabel()
+              }}
+              —
+              {{
+                tablePeriodLabel()
+              }}
+            </caption>
+            <thead
+              class="bg-emerald-950/40 text-xs tracking-wide text-slate-400 uppercase print:bg-slate-100 print:text-slate-700"
+            >
+              <tr>
                 @for (column of columns(); track column.key; let columnIndex = $index) {
-                  <td
-                    class="max-w-72 px-4 py-3.5 align-top text-slate-200 print:text-slate-800"
+                  <th
+                    scope="col"
+                    class="px-4 py-3 font-semibold whitespace-nowrap"
                     [class.text-right]="column.align === 'right'"
                     [class.text-center]="column.align === 'center'"
-                    [class.tabular-nums]="column.align === 'right' || column.align === 'center'"
                   >
-                    @if (isStatusColumn(columnIndex)) {
-                      <span
-                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
-                        [class]="statusBadgeClass(row, columnIndex)"
-                      >
-                        {{ cellValue(row, columnIndex) }}
-                      </span>
-                    } @else {
-                      {{ cellValue(row, columnIndex) }}
-                    }
-                  </td>
+                    {{ column.label }}
+                  </th>
                 }
               </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <footer
-        class="flex flex-col gap-3 border-t border-emerald-800/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5 print:hidden"
-      >
-        <p class="text-slate-400">
-          <span class="font-medium text-slate-200">{{ count(meta()?.total ?? 0) }}</span>
-          résultat(s)
-          <span class="text-slate-600">·</span>
-          Page {{ meta()?.current_page ?? 1 }} sur {{ meta()?.last_page ?? 1 }}
-        </p>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-            [disabled]="loading() || customRangeInvalid() || !hasPreviousPage()"
-            (click)="changePage((meta()?.current_page ?? 1) - 1)"
-          >
-            Précédent
-          </button>
-          <button
-            type="button"
-            class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-            [disabled]="loading() || customRangeInvalid() || !hasNextPage()"
-            (click)="changePage((meta()?.current_page ?? 1) + 1)"
-          >
-            Suivant
-          </button>
+            </thead>
+            <tbody class="divide-y divide-emerald-800/30 print:divide-slate-300">
+              @for (row of rows(); track $index) {
+                <tr class="transition hover:bg-emerald-900/30 print:hover:bg-transparent">
+                  @for (column of columns(); track column.key; let columnIndex = $index) {
+                    <td
+                      class="max-w-72 px-4 py-3.5 align-top text-slate-200 print:text-slate-800"
+                      [class.text-right]="column.align === 'right'"
+                      [class.text-center]="column.align === 'center'"
+                      [class.tabular-nums]="column.align === 'right' || column.align === 'center'"
+                    >
+                      @if (isStatusColumn(columnIndex)) {
+                        <span
+                          class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
+                          [class]="statusBadgeClass(row, columnIndex)"
+                        >
+                          {{ cellValue(row, columnIndex) }}
+                        </span>
+                      } @else {
+                        {{ cellValue(row, columnIndex) }}
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
-      </footer>
-    } @else {
-      <div class="p-10 text-center print:p-4">
-        <span
-          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25 print:hidden"
-          aria-hidden="true"
+
+        <footer
+          class="flex flex-col gap-3 border-t border-emerald-800/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5 print:hidden"
         >
-          <svg
-            class="h-6 w-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
+          <p class="text-slate-400">
+            <span class="font-medium text-slate-200">{{ count(meta()?.total ?? 0) }}</span>
+            résultat(s)
+            <span class="text-slate-600">·</span>
+            Page {{ meta()?.current_page ?? 1 }} sur {{ meta()?.last_page ?? 1 }}
+          </p>
+
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              [disabled]="loading() || customRangeInvalid() || !hasPreviousPage()"
+              (click)="changePage((meta()?.current_page ?? 1) - 1)"
+            >
+              Précédent
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              [disabled]="loading() || customRangeInvalid() || !hasNextPage()"
+              (click)="changePage((meta()?.current_page ?? 1) + 1)"
+            >
+              Suivant
+            </button>
+          </div>
+        </footer>
+      } @else if (!reportError()) {
+        <div class="p-10 text-center print:p-4">
+          <span
+            class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25 print:hidden"
+            aria-hidden="true"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-            />
-          </svg>
-        </span>
-        <p class="mt-4 text-sm font-semibold text-slate-200 print:mt-0 print:text-slate-900">
+            <svg
+              class="h-6 w-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+              />
+            </svg>
+          </span>
+          <p class="mt-4 text-sm font-semibold text-slate-200 print:mt-0 print:text-slate-900">
+            @if (hasActiveSearch()) {
+              Aucun résultat pour « {{ appliedSearch() }} »
+            } @else if (usesDatePeriod()) {
+              Aucune donnée pour cette période
+            } @else {
+              Aucune donnée disponible
+            }
+          </p>
+          <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
+            @if (hasActiveSearch()) {
+              Essayez un autre nom, une autre référence ou effacez la recherche.
+            } @else if (usesDatePeriod()) {
+              Modifiez la période ou choisissez un autre rapport pour afficher des données.
+            } @else {
+              Aucun élément ne correspond à ce rapport actuellement.
+            }
+          </p>
           @if (hasActiveSearch()) {
-            Aucun résultat pour « {{ appliedSearch() }} »
-          } @else {
-            Aucune donnée pour cette période
+            <button
+              type="button"
+              class="mt-4 inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none print:hidden"
+              (click)="clearSearch()"
+            >
+              Effacer la recherche
+            </button>
           }
-        </p>
-        <p class="mt-1 text-sm text-slate-400 print:text-slate-600">
-          @if (hasActiveSearch()) {
-            Essayez un autre nom, une autre référence ou effacez la recherche.
-          } @else {
-            Modifiez la période ou choisissez un autre rapport pour afficher des données.
-          }
-        </p>
-        @if (hasActiveSearch()) {
-          <button
-            type="button"
-            class="mt-4 inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-800/60 px-3 py-1.5 text-sm font-semibold text-slate-300 transition hover:border-emerald-500/60 hover:bg-emerald-900/40 hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:outline-none print:hidden"
-            (click)="clearSearch()"
-          >
-            Effacer la recherche
-          </button>
-        }
-      </div>
-    }
-  </section>
+        </div>
+      }
+    </section>
+  }
 </main>

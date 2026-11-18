@@ -6,9 +6,12 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\ManualPaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\RefundController;
+use App\Http\Controllers\Api\RefundDocumentController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SettingsController;
@@ -78,10 +81,51 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->whereNumber('sale')
         ->middleware('role:Admin|Gérant');
 
+    // Verification manuelle des paiements Wave et Orange Money.
+    Route::middleware('role:Admin|Gérant')->prefix('manual-payments')->group(function () {
+        Route::get('/', [ManualPaymentController::class, 'index']);
+        Route::post('/{payment}/confirm', [ManualPaymentController::class, 'confirm'])->whereNumber('payment');
+        Route::post('/{payment}/reject', [ManualPaymentController::class, 'reject'])->whereNumber('payment');
+    });
+
     Route::middleware('role:Admin|Gérant')->group(function () {
         Route::get('/sales', [SaleController::class, 'index']);
         Route::get('/sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale');
     });
+
+    // Remboursements : demande, consultation, approbation, rejet et annulation.
+    // L'annulation verifie elle-meme la permission requise selon le statut.
+    Route::get('/refunds', [RefundController::class, 'index']);
+    Route::get('/refunds/{refund}', [RefundController::class, 'show'])->whereNumber('refund');
+    Route::post('/refunds', [RefundController::class, 'store'])
+        ->middleware('can:demander_remboursement');
+    Route::post('/refunds/{refund}/approve', [RefundController::class, 'approve'])
+        ->whereNumber('refund')
+        ->middleware('can:approuver_remboursement');
+    Route::post('/refunds/{refund}/reject', [RefundController::class, 'reject'])
+        ->whereNumber('refund')
+        ->middleware('can:approuver_remboursement');
+    Route::post('/refunds/{refund}/cancel', [RefundController::class, 'cancel'])
+        ->whereNumber('refund');
+    Route::post('/refunds/{refund}/execute', [RefundController::class, 'execute'])
+        ->whereNumber('refund')
+        ->middleware('can:executer_remboursement');
+    Route::post('/refunds/{refund}/reconcile', [RefundController::class, 'reconcile'])
+        ->whereNumber('refund')
+        ->middleware('can:reconcilier_remboursement');
+    Route::get('/refunds/{refund}/documents', [RefundDocumentController::class, 'index'])
+        ->whereNumber('refund');
+    Route::post('/refunds/{refund}/documents', [RefundDocumentController::class, 'store'])
+        ->whereNumber('refund');
+    Route::get('/refunds/{refund}/documents/{document}', [RefundDocumentController::class, 'show'])
+        ->whereNumber('refund')
+        ->whereNumber('document');
+    Route::get('/refunds/{refund}/documents/{document}/download', [RefundDocumentController::class, 'download'])
+        ->whereNumber('refund')
+        ->whereNumber('document');
+    Route::delete('/refunds/{refund}/documents/{document}', [RefundDocumentController::class, 'destroy'])
+        ->whereNumber('refund')
+        ->whereNumber('document');
 
     // Listes de référence du catalogue, utilisées par le formulaire produit.
     Route::get('/categories', [CategoryController::class, 'index']);

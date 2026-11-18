@@ -174,7 +174,84 @@ describe('ReportsPage', () => {
 
     createPage();
 
-    expect(fixture.nativeElement.textContent).toContain('Erreur de chargement du rapport.');
+    const content = fixture.nativeElement.textContent as string;
+
+    expect(content).toContain('Erreur de chargement du rapport.');
+    expect(content).not.toContain('Aucune donnée pour cette période');
+  });
+
+  it('présente les notes comme un panneau replié', () => {
+    createPage();
+
+    const notes = fixture.nativeElement.querySelector('details.report-notes') as HTMLDetailsElement;
+
+    expect(notes).not.toBeNull();
+    expect(notes.open).toBe(false);
+    expect(notes.classList.contains('print:hidden')).toBe(true);
+    expect(notes.textContent).toContain('À propos des indicateurs');
+    expect(notes.textContent).toContain('Note de test');
+  });
+
+  it('utilise la période du rapport lorsque la synthèse échoue', () => {
+    reportService.summary.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 500,
+            error: { message: 'Synthèse indisponible.' },
+          }),
+      ),
+    );
+    reportService.report.mockReturnValue(
+      of({
+        ...page,
+        period: { from: '2026-11-01', to: '2026-11-03' },
+      }),
+    );
+
+    createPage();
+
+    expect(fixture.nativeElement.textContent).toContain('du 01/11/2026 au 03/11/2026');
+  });
+
+  it('affiche « état actuel » pour un rapport sans filtre de date', () => {
+    reportService.report.mockReturnValue(
+      of({
+        type: 'stock',
+        data: [{ id: 1, name: 'Ciment' }],
+        meta: { current_page: 1, last_page: 1, per_page: 25, total: 1 },
+      }),
+    );
+
+    createPage();
+
+    component().onTypeChange('stock');
+    fixture.detectChanges();
+
+    const content = fixture.nativeElement.textContent as string;
+
+    expect(content).toContain('état actuel');
+    expect(content).not.toContain('Aucune donnée pour cette période');
+  });
+
+  it('affiche un état vide sans mention de période pour un rapport instantané', () => {
+    reportService.report.mockReturnValue(
+      of({
+        type: 'stock',
+        data: [],
+        meta: { current_page: 1, last_page: 1, per_page: 25, total: 0 },
+      }),
+    );
+
+    createPage();
+
+    component().onTypeChange('stock');
+    fixture.detectChanges();
+
+    const content = fixture.nativeElement.textContent as string;
+
+    expect(content).toContain('Aucune donnée disponible');
+    expect(content).not.toContain('Aucune donnée pour cette période');
   });
 
   it('affiche le message lorsque la synthèse échoue mais conserve le rapport', () => {

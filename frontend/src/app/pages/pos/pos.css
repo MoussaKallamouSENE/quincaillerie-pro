@@ -15,3 +15,432 @@ aside ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background-color: rgb(16 185 129 / 25%);
 }
+
+.pos-cart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(6 95 70 / 55%);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(180deg, rgb(20 83 45 / 92%), rgb(6 78 59 / 96%));
+  box-shadow: 0 24px 60px rgb(2 44 34 / 45%);
+  backdrop-filter: blur(14px);
+}
+
+.pos-cart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgb(16 185 129 / 18%);
+}
+
+.pos-cart-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(110 231 183);
+}
+
+.pos-cart-title {
+  margin: 0.15rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: rgb(240 253 244);
+}
+
+.pos-cart-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: rgb(167 243 208);
+}
+
+.pos-link-danger {
+  border: 0;
+  background: transparent;
+  color: rgb(252 165 165);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pos-link-danger:hover {
+  color: rgb(254 202 202);
+  text-decoration: underline;
+}
+
+.pos-cart-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.pos-empty-cart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 8rem;
+  border: 1px dashed rgb(16 185 129 / 35%);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: rgb(167 243 208);
+}
+
+.pos-empty-cart p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgb(220 252 231);
+}
+
+.pos-empty-cart span {
+  font-size: 0.85rem;
+}
+
+.pos-cart-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgb(16 185 129 / 28%);
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 55%);
+  box-shadow: 0 10px 24px rgb(2 44 34 / 25%);
+}
+
+.pos-cart-line-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pos-cart-line-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgb(240 253 244);
+}
+
+.pos-cart-line-meta {
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: rgb(167 243 208);
+}
+
+.pos-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid rgb(16 185 129 / 30%);
+  border-radius: 0.75rem;
+  background: rgb(6 95 70 / 35%);
+  color: rgb(220 252 231);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pos-icon-button:hover {
+  background: rgb(16 185 129 / 25%);
+  color: rgb(255 255 255);
+}
+
+.pos-icon-button--danger:hover {
+  border-color: rgb(248 113 113 / 45%);
+  background: rgb(239 68 68 / 18%);
+  color: rgb(254 202 202);
+}
+
+.pos-cart-line-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pos-qty-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border: 1px solid rgb(16 185 129 / 30%);
+  border-radius: 0.85rem;
+  background: rgb(6 78 59 / 55%);
+}
+
+.pos-qty-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: rgb(16 185 129 / 18%);
+  color: rgb(220 252 231);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pos-qty-button:hover {
+  background: rgb(16 185 129 / 35%);
+  color: rgb(255 255 255);
+}
+
+.pos-qty-value {
+  min-width: 2rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(240 253 244);
+}
+
+.pos-line-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: rgb(110 231 183);
+}
+
+.pos-line-total small {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgb(167 243 208);
+}
+
+.pos-total-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgb(110 231 183 / 45%);
+  border-radius: 1.1rem;
+  background: linear-gradient(135deg, rgb(16 185 129 / 28%), rgb(5 150 105 / 24%));
+  box-shadow: 0 16px 36px rgb(5 150 105 / 20%);
+}
+
+.pos-total-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(220 252 231);
+}
+
+.pos-total-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: rgb(167 243 208);
+}
+
+.pos-total-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 2rem;
+  font-weight: 900;
+  color: rgb(240 253 244);
+}
+
+.pos-total-amount small {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgb(167 243 208);
+}
+
+.pos-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid rgb(16 185 129 / 20%);
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 35%);
+}
+
+.pos-section--muted {
+  background: rgb(6 78 59 / 25%);
+}
+
+.pos-field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(167 243 208);
+}
+
+.pos-select,
+.pos-input {
+  width: 100%;
+  border: 1px solid rgb(16 185 129 / 35%);
+  border-radius: 0.85rem;
+  background: rgb(6 95 70 / 35%);
+  padding: 0.8rem 0.95rem;
+  font-size: 1rem;
+  color: rgb(240 253 244);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pos-select:focus,
+.pos-input:focus {
+  outline: none;
+  border-color: rgb(110 231 183);
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 20%);
+}
+
+.pos-input-wrap {
+  position: relative;
+}
+
+.pos-input-suffix {
+  position: absolute;
+  inset: 0 0.85rem 0 auto;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: rgb(167 243 208);
+}
+
+.pos-input {
+  padding-right: 4.5rem;
+}
+
+.pos-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pos-payment-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-height: 4.5rem;
+  padding: 0.9rem;
+  border: 1px solid rgb(16 185 129 / 28%);
+  border-radius: 0.95rem;
+  background: rgb(6 78 59 / 40%);
+  color: rgb(220 252 231);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pos-payment-card:hover {
+  border-color: rgb(110 231 183 / 55%);
+  background: rgb(6 95 70 / 55%);
+}
+
+.pos-payment-card--active {
+  border-color: rgb(110 231 183);
+  background: linear-gradient(135deg, rgb(16 185 129 / 45%), rgb(5 150 105 / 40%));
+  box-shadow: 0 12px 28px rgb(5 150 105 / 25%);
+  color: rgb(255 255 255);
+}
+
+.pos-payment-card__title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.pos-payment-card__state {
+  font-size: 0.75rem;
+  color: rgb(167 243 208);
+}
+
+.pos-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.pos-required {
+  color: rgb(252 165 165);
+}
+
+.pos-field-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: rgb(167 243 208);
+}
+
+.pos-field-success {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgb(110 231 183);
+}
+
+.pos-field-warning {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgb(252 211 77);
+}
+
+.pos-alert {
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  font-size: 0.95rem;
+}
+
+.pos-alert--error {
+  border: 1px solid rgb(248 113 113 / 35%);
+  background: rgb(239 68 68 / 12%);
+  color: rgb(254 202 202);
+}
+
+.pos-validate-button {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 0;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgb(16 185 129), rgb(5 150 105));
+  color: rgb(255 255 255);
+  font-size: 1.05rem;
+  font-weight: 900;
+  box-shadow: 0 18px 36px rgb(5 150 105 / 30%);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.pos-validate-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 42px rgb(5 150 105 / 38%);
+}
+
+.pos-validate-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+@media (max-width: 1279px) {
+  .pos-cart-panel {
+    max-height: none;
+  }
+
+  .pos-payment-grid {
+    grid-template-columns: 1fr;
+  }
+}

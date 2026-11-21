@@ -818,3 +818,21 @@ aside ::-webkit-scrollbar-thumb {
 .pos-cart-workspace .pos-validate-button:hover:not(:disabled) {
   background: #15803d;
 }
+
+.pos-cart-layout {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1024px) {
+  .pos-cart-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+}
+
+.pos-cart-layout .pos-cart-summary {
+  position: sticky;
+  top: 1rem;
+}

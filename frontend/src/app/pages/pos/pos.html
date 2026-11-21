@@ -295,7 +295,8 @@
           <span>Cliquez sur un produit pour l’ajouter.</span>
         </div>
       } @else {
-        <div class="pos-cart-table-wrap">
+        <div class="pos-cart-layout">
+          <div class="pos-cart-table-wrap">
           <table class="pos-cart-table">
             <thead>
               <tr>
@@ -354,26 +355,27 @@
             </tbody>
           </table>
         </div>
+      </div>
       }
 
       <div class="pos-cart-summary">
-          <div class="pos-summary-row">
-            <span>Nombre d’articles</span>
-            <strong>{{ cartCount() }}</strong>
-          </div>
-          <div class="pos-summary-row">
-            <span>Sous-total</span>
-            <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
-          </div>
-          <div class="pos-summary-row">
-            <span>Remise</span>
-            <strong>0,00 FCFA</strong>
-          </div>
-          <div class="pos-summary-row pos-summary-row--total" aria-live="polite">
-            <span>Total TTC</span>
-            <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
-          </div>
+        <div class="pos-summary-row">
+          <span>Nombre d’articles</span>
+          <strong>{{ cartCount() }}</strong>
         </div>
+        <div class="pos-summary-row">
+          <span>Sous-total</span>
+          <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
+        </div>
+        <div class="pos-summary-row">
+          <span>Remise</span>
+          <strong>0,00 FCFA</strong>
+        </div>
+        <div class="pos-summary-row pos-summary-row--total" aria-live="polite">
+          <span>Total TTC</span>
+          <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
+        </div>
+      </div>
 
       <section class="pos-section">
         <label for="pos-customer" class="pos-field-label">Client (optionnel)</label>
@@ -469,8 +471,8 @@
         </button>
       </div>
     </aside>
-
     }
+
   </div>
 </div>
 

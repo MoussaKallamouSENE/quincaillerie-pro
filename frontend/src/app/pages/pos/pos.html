@@ -61,10 +61,51 @@
     }
   </header>
 
+  <!-- Barre d'onglets de travail -->
+  <nav class="pos-workspace-tabs" aria-label="Espaces de travail">
+    <button
+      type="button"
+      (click)="selectTab('caisse')"
+      [class.pos-workspace-tab--active]="activeTab() === 'caisse'"
+      class="pos-workspace-tab"
+    >
+      Caisse
+    </button>
+
+    @if (cartTabOpen()) {
+      <button
+        type="button"
+        (click)="selectTab('panier')"
+        [class.pos-workspace-tab--active]="activeTab() === 'panier'"
+        class="pos-workspace-tab pos-workspace-tab--closable"
+      >
+        <span>Panier ({{ cartCount() }})</span>
+        <span
+          role="button"
+          tabindex="0"
+          (click)="closeCartTab(); $event.stopPropagation()"
+          (keydown.enter)="closeCartTab(); $event.stopPropagation()"
+          class="pos-workspace-tab__close"
+          aria-label="Fermer l'onglet Panier"
+        >
+          ×
+        </span>
+      </button>
+    } @else {
+      <button type="button" (click)="openCartTab()" class="pos-workspace-tab pos-workspace-tab--muted">
+        Ouvrir le panier ({{ cartCount() }})
+      </button>
+    }
+  </nav>
+
   <!-- Corps : catalogue a gauche, panier a droite -->
-  <div class="grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+  <div
+    class="grid flex-1 gap-5"
+    [class.xl:grid-cols-[minmax(0,1fr)_400px]]="activeTab() === 'caisse'"
+    [class.grid-cols-1]="activeTab() !== 'caisse'"
+  >
     <!-- Catalogue -->
-    <section class="flex min-w-0 flex-col gap-4">
+    <section class="flex min-w-0 flex-col gap-4" [class.hidden]="activeTab() !== 'caisse'">
       <!-- Recherche -->
       <div class="relative">
         <svg
@@ -230,7 +271,7 @@
     </section>
 
     <!-- Panier -->
-    <aside class="pos-cart-panel">
+    <aside class="pos-cart-panel" [class.hidden]="activeTab() !== 'panier'">
       <!-- En-tete -->
       <header class="pos-cart-header">
         <div>

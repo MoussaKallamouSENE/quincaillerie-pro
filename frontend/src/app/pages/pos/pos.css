@@ -495,3 +495,64 @@ aside ::-webkit-scrollbar-thumb {
   gap: 0.6rem;
   margin-top: 0.25rem;
 }
+
+.pos-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid rgb(16 185 129 / 20%);
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 35%);
+}
+
+.pos-workspace-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgb(16 185 129 / 25%);
+  border-radius: 0.8rem;
+  background: rgb(6 78 59 / 35%);
+  color: rgb(220 252 231);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pos-workspace-tab:hover {
+  background: rgb(6 95 70 / 55%);
+}
+
+.pos-workspace-tab--active {
+  border-color: rgb(110 231 183);
+  background: linear-gradient(135deg, rgb(16 185 129 / 45%), rgb(5 150 105 / 40%));
+  color: rgb(255 255 255);
+  box-shadow: 0 10px 22px rgb(5 150 105 / 20%);
+}
+
+.pos-workspace-tab--muted {
+  color: rgb(167 243 208);
+}
+
+.pos-workspace-tab--closable {
+  padding-right: 0.65rem;
+}
+
+.pos-workspace-tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 12%);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pos-workspace-tab__close:hover {
+  background: rgb(239 68 68 / 35%);
+}

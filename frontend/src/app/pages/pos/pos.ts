@@ -225,6 +225,31 @@ export class Pos {
   /** Mode de paiement selectionne. */
   protected readonly paymentMethod = signal<PaymentMethod>('cash');
 
+  /** Onglet de travail actuellement affiche. */
+  protected readonly activeTab = signal<'caisse' | 'panier'>('caisse');
+
+  /** Vrai lorsque l'onglet Panier a ete ouvert au moins une fois. */
+  protected readonly cartTabOpen = signal(false);
+
+  /** Ouvre l'onglet Panier sans perdre le panier en cours. */
+  protected openCartTab(): void {
+    this.cartTabOpen.set(true);
+    this.activeTab.set('panier');
+  }
+
+  /** Ferme l'onglet Panier tout en conservant son contenu. */
+  protected closeCartTab(): void {
+    this.cartTabOpen.set(false);
+    if (this.activeTab() === 'panier') {
+      this.activeTab.set('caisse');
+    }
+  }
+
+  /** Active un onglet de travail. */
+  protected selectTab(tab: 'caisse' | 'panier'): void {
+    this.activeTab.set(tab);
+  }
+
   /** Reference de transaction saisie pour Wave ou Orange Money. */
   protected readonly paymentReference = signal('');
 

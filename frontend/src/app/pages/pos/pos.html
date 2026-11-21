@@ -637,7 +637,7 @@
       <form class="mt-5" [formGroup]="closingForm" (ngSubmit)="onCloseSession()">
         <dl class="mb-4 space-y-2 rounded-lg bg-emerald-950/40 px-3.5 py-3 text-sm">
           <div class="flex items-center justify-between">
-            <dt class="text-slate-400">Ventes en espèces de la session</dt>
+            <dt class="text-slate-400">Encaissements en espèces de la session</dt>
             <dd class="font-semibold text-slate-100">
               {{ cashSession()?.cash_received | number: '1.2-2' }} FCFA
             </dd>
@@ -943,7 +943,7 @@
           </dd>
         </div>
         <div class="flex items-center justify-between">
-          <dt class="text-slate-400">Ventes en espèces</dt>
+          <dt class="text-slate-400">Encaissements en espèces</dt>
           <dd class="font-medium text-slate-100">
             {{ session.cash_received | number: '1.2-2' }} FCFA
           </dd>

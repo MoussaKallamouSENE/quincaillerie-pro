@@ -629,7 +629,7 @@ describe('Pos', () => {
     expect(dialog()).toBeTruthy();
 
     // La modale rappelle le total des ventes en especes de la session.
-    expect(element.textContent).toContain('Ventes en espèces de la session');
+    expect(element.textContent).toContain('Encaissements en espèces de la session');
     expect(element.textContent).toContain('Montant compté en espèces');
 
     setField('#pos-closing-balance', '48000');

@@ -16,6 +16,7 @@ const SESSION: CashSession = {
   expected_cash: '50000.00',
   cash_received: '0.00',
   expenses_total: '0.00',
+  refunds_total: '0.00',
   difference: null,
   opening_difference: null,
 };

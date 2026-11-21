@@ -648,6 +648,12 @@
               −{{ cashSession()?.expenses_total | number: '1.2-2' }} FCFA
             </dd>
           </div>
+          <div class="flex items-center justify-between">
+            <dt class="text-slate-400">Remboursements</dt>
+            <dd class="text-slate-300">
+              −{{ cashSession()?.refunds_total | number: '1.2-2' }} FCFA
+            </dd>
+          </div>
           <div class="flex items-center justify-between border-t border-emerald-900/60 pt-2">
             <dt class="text-slate-400">Solde théorique</dt>
             <dd class="font-semibold text-emerald-300">

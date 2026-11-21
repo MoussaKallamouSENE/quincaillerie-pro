@@ -24,10 +24,12 @@ export interface CashSession {
   status: CashSessionStatus;
   opened_at: string | null;
   closed_at: string | null;
-  /** Especes encaissees pendant la session (ventes reglees en especes). */
+  /** Especes encaissees pendant la session. */
   cash_received: string;
   /** Depenses payees pendant la session, retirees du tiroir. */
   expenses_total: string;
+  /** Remboursements payes en especes pendant la session, retires du tiroir. */
+  refunds_total: string;
   /** Theorique du tiroir : fond de caisse + especes encaissees - depenses. */
   expected_cash: string;
   /**

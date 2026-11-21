@@ -550,3 +550,100 @@ aside ::-webkit-scrollbar-thumb {
 .pos-workspace-tab__close:hover {
   background: rgb(239 68 68 / 35%);
 }
+
+.pos-cart-table-wrap {
+  overflow-x: auto;
+  border-radius: 0.9rem;
+  background: rgb(6 78 59 / 20%);
+}
+
+.pos-cart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  color: rgb(220 252 231);
+}
+
+.pos-cart-table th {
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(167 243 208);
+  background: rgb(6 78 59 / 45%);
+}
+
+.pos-cart-table td {
+  padding: 0.85rem 0.75rem;
+  border-top: 1px solid rgb(16 185 129 / 12%);
+  vertical-align: middle;
+}
+
+.pos-cart-product-cell {
+  min-width: 12rem;
+}
+
+.pos-cart-product-name {
+  font-weight: 700;
+  color: rgb(240 253 244);
+}
+
+.pos-product-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgb(16 185 129 / 35%), rgb(5 150 105 / 30%));
+  color: rgb(240 253 244);
+  font-weight: 800;
+}
+
+.pos-cart-subtotal {
+  font-weight: 800;
+  color: rgb(110 231 183);
+}
+
+.pos-cart-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgb(6 78 59 / 28%);
+}
+
+.pos-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: rgb(220 252 231);
+}
+
+.pos-summary-row--total {
+  padding-top: 0.65rem;
+  border-top: 1px solid rgb(16 185 129 / 20%);
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: rgb(240 253 244);
+}
+
+.pos-cart-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 767px) {
+  .pos-cart-table {
+    font-size: 0.85rem;
+  }
+
+  .pos-cart-actions {
+    grid-template-columns: 1fr;
+  }
+}

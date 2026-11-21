@@ -392,7 +392,7 @@ describe('Pos', () => {
     fixture.detectChanges();
 
     expect(toastService.toasts()[0]?.message).toContain('Stock insuffisant');
-    expect(normalizeSpaces(element.textContent ?? '')).toContain('Total général');
+    expect(normalizeSpaces(element.textContent ?? '')).toContain('Total TTC');
     expect(normalizeSpaces(element.textContent ?? '')).toContain('250,00');
   });
 

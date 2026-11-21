@@ -264,10 +264,9 @@
     } @else {
     <!-- Panier -->
     <aside class="pos-cart-workspace">
-      <!-- En-tete -->
       <header class="pos-cart-header">
         <div>
-          <p class="pos-cart-kicker">Caisse</p>
+          <p class="pos-cart-kicker">Panier</p>
           <h2 class="pos-cart-title">Panier</h2>
           <p class="pos-cart-subtitle">{{ cartCount() }} article(s) · {{ cart().length }} ligne(s)</p>
         </div>
@@ -279,99 +278,94 @@
         }
       </header>
 
-      <!-- Lignes du panier -->
-      <div class="pos-cart-lines">
-        @if (cart().length === 0) {
-          <div class="pos-empty-cart">
-            <svg class="h-10 w-10 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
-            </svg>
-            <p>Panier vide</p>
-            <span>Cliquez sur un produit pour l’ajouter.</span>
+      @if (cart().length === 0) {
+        <div class="pos-empty-cart">
+          <svg class="h-10 w-10 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+          </svg>
+          <p>Panier vide</p>
+          <span>Cliquez sur un produit pour l’ajouter.</span>
+        </div>
+      } @else {
+        <div class="pos-cart-table-wrap">
+          <table class="pos-cart-table">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>Photo</th>
+                <th>Référence</th>
+                <th>Prix unitaire</th>
+                <th>Quantité</th>
+                <th>Sous-total</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of cart(); track line.product.id) {
+                <tr>
+                  <td class="pos-cart-product-cell">
+                    <span class="pos-cart-product-name">{{ line.product.name }}</span>
+                  </td>
+                  <td>
+                    <div class="pos-product-photo" aria-hidden="true">
+                      {{ line.product.name.charAt(0) }}
+                    </div>
+                  </td>
+                  <td>{{ line.product.sku }}</td>
+                  <td>{{ line.unitPrice | number: '1.2-2' }} FCFA</td>
+                  <td>
+                    <div class="pos-qty-control">
+                      <button type="button" (click)="decrement(line)" class="pos-qty-button" [attr.aria-label]="'Retirer une unité de ' + line.product.name">
+                        −
+                      </button>
+                      <span class="pos-qty-value">{{ line.quantity }}</span>
+                      <button type="button" (click)="increment(line)" class="pos-qty-button" [attr.aria-label]="'Ajouter une unité de ' + line.product.name">
+                        +
+                      </button>
+                    </div>
+                  </td>
+                  <td class="pos-cart-subtotal">
+                    {{ line.unitPrice * line.quantity | number: '1.2-2' }} FCFA
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      (click)="removeFromCart(line)"
+                      class="pos-icon-button pos-icon-button--danger"
+                      [attr.aria-label]="'Retirer ' + line.product.name + ' du panier'"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <div class="pos-cart-summary">
+          <div class="pos-summary-row">
+            <span>Nombre d’articles</span>
+            <strong>{{ cartCount() }}</strong>
           </div>
-        }
-
-        @for (line of cart(); track line.product.id) {
-          <article class="pos-cart-line">
-            <div class="pos-cart-line-head">
-              <div class="min-w-0">
-                <h3 class="pos-cart-line-name">{{ line.product.name }}</h3>
-                <p class="pos-cart-line-meta">
-                  <span>{{ line.product.sku }}</span>
-                  <span>·</span>
-                  <span>{{ line.unitPrice | number: '1.2-2' }} FCFA / unité</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                (click)="removeFromCart(line)"
-                class="pos-icon-button pos-icon-button--danger"
-                [attr.aria-label]="'Retirer ' + line.product.name + ' du panier'"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div class="pos-cart-line-foot">
-              <div class="pos-qty-control">
-                <button
-                  type="button"
-                  (click)="decrement(line)"
-                  class="pos-qty-button"
-                  [attr.aria-label]="'Retirer une unité de ' + line.product.name"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
-                  </svg>
-                </button>
-
-                <span class="pos-qty-value">{{ line.quantity }}</span>
-
-                <button
-                  type="button"
-                  (click)="increment(line)"
-                  class="pos-qty-button"
-                  [attr.aria-label]="'Ajouter une unité de ' + line.product.name"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
-              </div>
-
-              <div class="pos-line-total">
-                <span>{{ line.unitPrice * line.quantity | number: '1.2-2' }}</span>
-                <small>FCFA</small>
-              </div>
-            </div>
-          </article>
-        }
-      </div>
-
-      <!-- Total -->
-      <section class="pos-total-panel" aria-live="polite">
-        <div>
-          <p class="pos-total-label">Total général</p>
-          <p class="pos-total-hint">{{ cartCount() }} article(s)</p>
+          <div class="pos-summary-row">
+            <span>Sous-total</span>
+            <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
+          </div>
+          <div class="pos-summary-row">
+            <span>Remise</span>
+            <strong>0,00 FCFA</strong>
+          </div>
+          <div class="pos-summary-row pos-summary-row--total" aria-live="polite">
+            <span>Total TTC</span>
+            <strong>{{ cartTotal() | number: '1.2-2' }} FCFA</strong>
+          </div>
         </div>
-        <div class="pos-total-amount">
-          <span>{{ cartTotal() | number: '1.2-2' }}</span>
-          <small>FCFA</small>
-        </div>
-      </section>
 
-      <!-- Client et reglement -->
       <section class="pos-section">
         <label for="pos-customer" class="pos-field-label">Client (optionnel)</label>
-        <select
-          id="pos-customer"
-          [value]="selectedCustomerId() ?? ''"
-          (change)="onSelectCustomer($event)"
-          class="pos-select"
-        >
+        <select id="pos-customer" [value]="selectedCustomerId() ?? ''" (change)="onSelectCustomer($event)" class="pos-select">
           <option value="">Aucun client (vente comptant)</option>
           @for (customer of customers.value()?.data ?? []; track customer.id) {
             <option [value]="customer.id">{{ customer.name }}</option>
@@ -379,60 +373,26 @@
         </select>
 
         @if (selectedCustomer(); as customer) {
-          <p class="pos-field-help">
-            Dette en cours : {{ customer.outstanding_balance | number: '1.2-2' }} FCFA
-          </p>
+          <p class="pos-field-help">Dette en cours : {{ customer.outstanding_balance | number: '1.2-2' }} FCFA</p>
         }
 
         @if (!newCustomerMode()) {
-          <button type="button" (click)="startNewCustomer()" class="pos-secondary-button">
-            + Nouveau client
-          </button>
+          <button type="button" (click)="startNewCustomer()" class="pos-secondary-button">+ Nouveau client</button>
         } @else {
           <div class="pos-new-customer">
             <label class="pos-field-label" for="pos-new-customer-name">Nom du client</label>
-            <input
-              id="pos-new-customer-name"
-              type="text"
-              maxlength="255"
-              [value]="newCustomerName()"
-              (input)="newCustomerName.set(($any($event.target)).value)"
-              placeholder="Nom du nouveau client"
-              class="pos-input"
-            />
+            <input id="pos-new-customer-name" type="text" maxlength="255" [value]="newCustomerName()" (input)="newCustomerName.set(($any($event.target)).value)" placeholder="Nom du nouveau client" class="pos-input" />
 
             <label class="pos-field-label" for="pos-new-customer-phone">Téléphone (facultatif)</label>
-            <input
-              id="pos-new-customer-phone"
-              type="tel"
-              maxlength="255"
-              [value]="newCustomerPhone()"
-              (input)="newCustomerPhone.set(($any($event.target)).value)"
-              placeholder="Numéro de téléphone"
-              class="pos-input"
-            />
+            <input id="pos-new-customer-phone" type="tel" maxlength="255" [value]="newCustomerPhone()" (input)="newCustomerPhone.set(($any($event.target)).value)" placeholder="Numéro de téléphone" class="pos-input" />
 
             @if (newCustomerError(); as error) {
               <p class="pos-field-warning">{{ error }}</p>
             }
 
             <div class="pos-new-customer-actions">
-              <button
-                type="button"
-                (click)="cancelNewCustomer()"
-                [disabled]="newCustomerSubmitting()"
-                class="pos-secondary-button"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                (click)="saveNewCustomer()"
-                [disabled]="newCustomerSubmitting()"
-                class="pos-primary-button"
-              >
-                {{ newCustomerSubmitting() ? 'Enregistrement…' : 'Enregistrer' }}
-              </button>
+              <button type="button" (click)="cancelNewCustomer()" [disabled]="newCustomerSubmitting()" class="pos-secondary-button">Annuler</button>
+              <button type="button" (click)="saveNewCustomer()" [disabled]="newCustomerSubmitting()" class="pos-primary-button">{{ newCustomerSubmitting() ? 'Enregistrement…' : 'Enregistrer' }}</button>
             </div>
           </div>
         }
@@ -445,11 +405,7 @@
             <button
               type="button"
               (click)="onSelectPaymentMethod(option.method)"
-              [class]="
-                paymentMethod() === option.method
-                  ? 'pos-payment-card pos-payment-card--active'
-                  : 'pos-payment-card'
-              "
+              [class]="paymentMethod() === option.method ? 'pos-payment-card pos-payment-card--active' : 'pos-payment-card'"
             >
               <span class="pos-payment-card__title">{{ option.label }}</span>
               <span class="pos-payment-card__state">{{ paymentMethod() === option.method ? 'Sélectionné' : 'Choisir' }}</span>
@@ -462,29 +418,16 @@
         <section class="pos-section pos-section--muted">
           <label for="pos-received" class="pos-field-label">Montant reçu</label>
           <div class="pos-input-wrap">
-            <input
-              id="pos-received"
-              type="number"
-              min="0"
-              step="any"
-              inputmode="decimal"
-              [value]="receivedAmount()"
-              (input)="onReceivedAmount($event)"
-              class="pos-input"
-            />
+            <input id="pos-received" type="number" min="0" step="any" inputmode="decimal" [value]="receivedAmount()" (input)="onReceivedAmount($event)" class="pos-input" />
             <span class="pos-input-suffix">FCFA</span>
           </div>
 
           @if (changeDue() > 0) {
-            <p class="pos-field-success">
-              Monnaie à rendre : {{ changeDue() | number: '1.2-2' }} FCFA
-            </p>
+            <p class="pos-field-success">Monnaie à rendre : {{ changeDue() | number: '1.2-2' }} FCFA</p>
           }
 
           @if (dueAmount() > 0) {
-            <p class="pos-field-warning">
-              Reste dû : {{ dueAmount() | number: '1.2-2' }} FCFA
-            </p>
+            <p class="pos-field-warning">Reste dû : {{ dueAmount() | number: '1.2-2' }} FCFA</p>
           }
 
           @if (requiresPaymentReference()) {
@@ -492,45 +435,29 @@
               <label for="pos-payment-reference" class="pos-field-label">
                 Référence de transaction <span class="pos-required">*</span>
               </label>
-              <input
-                id="pos-payment-reference"
-                type="text"
-                maxlength="255"
-                [value]="paymentReference()"
-                (input)="onPaymentReference($event)"
-                placeholder="Référence Wave ou Orange Money"
-                class="pos-input"
-              />
-              <p class="pos-field-warning">
-                Le paiement sera enregistré comme « En attente de vérification ».
-              </p>
+              <input id="pos-payment-reference" type="text" maxlength="255" [value]="paymentReference()" (input)="onPaymentReference($event)" placeholder="Référence Wave ou Orange Money" class="pos-input" />
+              <p class="pos-field-warning">Le paiement sera enregistré comme « En attente de vérification ».</p>
             </div>
           }
         </section>
       } @else {
         <section class="pos-section pos-section--muted">
-          <p class="pos-field-warning">
-            La totalité de la vente sera reportée sur la dette du client.
-          </p>
+          <p class="pos-field-warning">La totalité de la vente sera reportée sur la dette du client.</p>
         </section>
       }
 
       @if (saleError(); as error) {
-        <p class="pos-alert pos-alert--error" role="alert">
-          {{ error }}
-        </p>
+        <p class="pos-alert pos-alert--error" role="alert">{{ error }}</p>
       }
 
-      <button
-        type="button"
-        (click)="onValidateSale()"
-        [disabled]="submitting() || cart().length === 0"
-        class="pos-validate-button"
-      >
-        {{ submitting() ? 'Enregistrement…' : 'Valider la vente' }}
-      </button>
-
+      <div class="pos-cart-actions">
+        <button type="button" (click)="selectTab('caisse')" class="pos-secondary-button">Retour</button>
+        <button type="button" (click)="onValidateSale()" [disabled]="submitting() || cart().length === 0" class="pos-primary-button">
+          {{ submitting() ? 'Enregistrement…' : 'Valider la vente' }}
+        </button>
+      </div>
     </aside>
+
     }
   </div>
 </div>

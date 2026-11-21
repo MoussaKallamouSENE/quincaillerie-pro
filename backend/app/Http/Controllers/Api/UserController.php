@@ -93,9 +93,10 @@ class UserController extends Controller
         $this->assertCanManageUsers();
 
         $data = $request->validated();
-        $role = $this->roleForAssignment($data['role'], $request->user());
 
-        $user = DB::transaction(function () use ($data, $role): User {
+        $user = DB::transaction(function () use ($data, $request): User {
+            $role = $this->roleForAssignment($data['role'], $request->user());
+
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -135,9 +136,9 @@ class UserController extends Controller
         $this->assertCanManageUsers();
 
         $data = $request->validated();
-        $role = isset($data['role']) ? $this->roleForAssignment($data['role'], $request->user(), $user) : null;
 
-        DB::transaction(function () use ($data, $role, $user): void {
+        DB::transaction(function () use ($data, $request, $user): void {
+            $role = isset($data['role']) ? $this->roleForAssignment($data['role'], $request->user(), $user) : null;
             $user->fill(Arr::only($data, ['name', 'email', 'phone', 'is_active']));
 
             if (! empty($data['password'])) {
@@ -203,9 +204,18 @@ class UserController extends Controller
      */
     private function roleForAssignment(string $name, User $actor, ?User $target = null): Role
     {
-        $role = Role::query()->where('guard_name', 'web')->where('name', $name)->first();
+        // La contrainte unique (name, guard_name) peut être insensible à la
+        // casse selon la collation MySQL. Le verrou FOR UPDATE serialise les
+        // modifications concurrentes du rôle ; la comparaison stricte PHP
+        // garantit ensuite que le nom réellement attribué est exactement celui
+        // demandé (casse, accents, caractères Unicode).
+        $role = Role::query()
+            ->where('guard_name', 'web')
+            ->where('name', $name)
+            ->lockForUpdate()
+            ->first();
 
-        if ($role === null) {
+        if ($role === null || $role->name !== $name) {
             throw ValidationException::withMessages(['role' => 'Le rôle sélectionné n’existe pas.']);
         }
 
@@ -213,8 +223,16 @@ class UserController extends Controller
             throw new AuthorizationException('Seul un administrateur peut attribuer le rôle Admin.');
         }
 
-        if ($target?->is($actor) && $role->name !== $target->getRoleNames()->first()) {
-            throw new AuthorizationException('Vous ne pouvez pas modifier votre propre rôle.');
+        if ($target?->is($actor)) {
+            $currentRoles = $target->getRoleNames()
+                ->values()
+                ->sort()
+                ->values()
+                ->all();
+
+            if ($currentRoles !== [$role->name]) {
+                throw new AuthorizationException('Vous ne pouvez pas modifier votre propre rôle.');
+            }
         }
 
         return $role;

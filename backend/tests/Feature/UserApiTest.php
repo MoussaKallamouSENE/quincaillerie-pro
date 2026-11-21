@@ -303,6 +303,59 @@ class UserApiTest extends TestCase
         $this->assertSame(['Employé'], $employee->getRoleNames()->all());
     }
 
+    public function test_a_lowercase_admin_role_is_not_accepted(): void
+    {
+        $this->authenticateAs('Admin');
+
+        $this->postJson('/api/users', $this->payload([
+            'email' => 'casse@quincaillerie.com',
+            'role' => 'admin',
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'casse@quincaillerie.com']);
+    }
+
+    public function test_a_visually_similar_unicode_role_is_not_confused_with_admin(): void
+    {
+        $this->authenticateAs('Admin');
+
+        $this->postJson('/api/users', $this->payload([
+            'email' => 'unicode@quincaillerie.com',
+            'role' => "\u{0391}dmin",
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'unicode@quincaillerie.com']);
+    }
+
+    public function test_a_multi_role_user_cannot_change_their_own_role_set(): void
+    {
+        $admin = $this->authenticateAs('Admin');
+        $admin->assignRole($this->role('Gérant'));
+
+        $this->putJson("/api/users/{$admin->id}", ['role' => 'Admin'])
+            ->assertForbidden();
+
+        $admin->refresh();
+        $this->assertEqualsCanonicalizing(['Admin', 'Gérant'], $admin->getRoleNames()->all());
+    }
+
+    public function test_assigning_a_deleted_role_is_rejected(): void
+    {
+        $this->authenticateAs('Admin');
+        $role = Role::create(['name' => 'Temporaire', 'guard_name' => 'web']);
+        $role->delete();
+
+        $this->postJson('/api/users', $this->payload([
+            'email' => 'supprime@quincaillerie.com',
+            'role' => 'Temporaire',
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'supprime@quincaillerie.com']);
+    }
+
     public function test_an_admin_can_create_an_admin(): void
     {
         $this->authenticateAs('Admin');

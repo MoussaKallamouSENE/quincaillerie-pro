@@ -893,6 +893,8 @@ describe('Pos', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     buttonStartingWith('Boulon M8')?.click();
+    fixture.detectChanges();
+
     buttonStartingWith('Wave')?.click();
     fixture.detectChanges();
 
@@ -906,6 +908,9 @@ describe('Pos', () => {
     fixture.detectChanges();
 
     expect((element.querySelector('#pos-payment-reference') as HTMLInputElement).value).toBe('');
+
+    buttonStartingWith('Caisse')?.click();
+    fixture.detectChanges();
 
     buttonStartingWith('Boulon M8')?.click();
     fixture.detectChanges();

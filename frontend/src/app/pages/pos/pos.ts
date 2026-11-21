@@ -535,6 +535,7 @@ export class Pos {
       { product, quantity: 1, unitPrice: Number(product.sale_price) },
     ]);
     this.saleIdempotencyKey.set(null);
+    this.openCartTab();
   }
 
   /** Augmente la quantite d'une ligne du panier. */

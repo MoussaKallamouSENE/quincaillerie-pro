@@ -22,8 +22,43 @@ export class ProductService {
   }
 
   createProduct(draft: ProductDraft): Observable<Product> {
+    const formData = new FormData();
+    formData.append('name', draft.name);
+    formData.append('sku', draft.sku);
+    formData.append('category_id', String(draft.category_id));
+    formData.append('unit_id', String(draft.unit_id));
+    formData.append('purchase_price', String(draft.purchase_price));
+    formData.append('sale_price', String(draft.sale_price));
+    formData.append('stock_quantity', String(draft.stock_quantity));
+    formData.append('min_stock_alert', String(draft.min_stock_alert));
+    if (draft.image) {
+      formData.append('image', draft.image);
+    }
+
     return this.http
-      .post<ProductResponse>(this.productsUrl, draft)
+      .post<ProductResponse>(this.productsUrl, formData)
+      .pipe(map((response) => response.data));
+  }
+
+  updateProduct(id: number, draft: ProductDraft & { remove_image?: boolean }): Observable<Product> {
+    const formData = new FormData();
+    Object.entries(draft).forEach(([key, value]) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+      if (key === 'image' && value instanceof File) {
+        formData.append('image', value);
+        return;
+      }
+      if (key === 'remove_image') {
+        formData.append('remove_image', value ? '1' : '0');
+        return;
+      }
+      formData.append(key, String(value));
+    });
+
+    return this.http
+      .put<ProductResponse>(`${this.productsUrl}/${id}`, formData)
       .pipe(map((response) => response.data));
   }
 

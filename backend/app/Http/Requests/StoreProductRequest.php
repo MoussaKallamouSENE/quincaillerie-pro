@@ -35,6 +35,8 @@ class StoreProductRequest extends FormRequest
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'min_stock_alert' => ['required', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+            'image' => ['sometimes', 'nullable', 'file', 'image', 'mimes:jpeg,png,webp', 'max:2048'],
+            'remove_image' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -57,6 +59,9 @@ class StoreProductRequest extends FormRequest
             'sale_price.required' => 'Le prix de vente est obligatoire.',
             'stock_quantity.required' => 'La quantité en stock est obligatoire.',
             'min_stock_alert.required' => 'Le seuil d’alerte de stock est obligatoire.',
+            'image.image' => 'Le fichier doit être une image valide.',
+            'image.mimes' => 'La photo doit être au format JPEG, PNG ou WebP.',
+            'image.max' => 'La photo ne peut pas dépasser 2 Mo.',
         ];
     }
 

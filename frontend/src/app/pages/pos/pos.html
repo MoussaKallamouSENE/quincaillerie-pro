@@ -172,6 +172,14 @@
               [disabled]="product.stock_quantity <= 0"
               class="group flex flex-col justify-between gap-3 rounded-xl border border-emerald-800/50 bg-[#153322] p-4 text-left transition hover:border-emerald-500/70 hover:bg-[#19402a] focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-emerald-800/50 disabled:hover:bg-[#153322]"
             >
+              <span class="flex h-24 items-center justify-center overflow-hidden rounded-lg bg-emerald-950/40">
+                @if (product.image_url) {
+                  <img [src]="product.image_url" [alt]="product.name" class="h-full w-full object-cover" />
+                } @else {
+                  <span class="text-2xl font-bold text-emerald-300">{{ product.name.charAt(0) }}</span>
+                }
+              </span>
+
               <span class="min-w-0">
                 <span class="block text-sm font-semibold text-slate-100 group-hover:text-white">
                   {{ product.name }}
@@ -307,9 +315,13 @@
                     <span class="pos-cart-product-name">{{ line.product.name }}</span>
                   </td>
                   <td>
-                    <div class="pos-product-photo" aria-hidden="true">
-                      {{ line.product.name.charAt(0) }}
-                    </div>
+                    @if (line.product.image_url) {
+                      <img [src]="line.product.image_url" [alt]="line.product.name" class="h-10 w-10 rounded-lg object-cover" />
+                    } @else {
+                      <div class="pos-product-photo" aria-hidden="true">
+                        {{ line.product.name.charAt(0) }}
+                      </div>
+                    }
                   </td>
                   <td>{{ line.product.sku }}</td>
                   <td>{{ line.unitPrice | number: '1.2-2' }} FCFA</td>

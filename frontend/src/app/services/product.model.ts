@@ -35,6 +35,8 @@ export interface Product {
   min_stock_alert: number;
   is_active: boolean;
   is_low_stock: boolean;
+  /** URL publique de la photo, ou null. */
+  image_url?: string | null;
 }
 
 /** Pagination renvojee par Laravel dans `meta`. */
@@ -88,4 +90,6 @@ export interface ProductDraft {
   sale_price: number;
   stock_quantity: number;
   min_stock_alert: number;
+  /** Photo du produit, facultative. */
+  image?: File | null;
 }

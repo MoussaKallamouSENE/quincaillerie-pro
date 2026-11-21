@@ -189,6 +189,7 @@
             <tr
               class="border-b border-emerald-800/40 text-xs tracking-wider text-slate-400 uppercase"
             >
+              <th scope="col" class="px-6 py-3 font-medium">Photo</th>
               <th scope="col" class="px-6 py-3 font-medium">SKU</th>
               <th scope="col" class="px-6 py-3 font-medium">Nom</th>
               <th scope="col" class="px-6 py-3 font-medium">Catégorie</th>
@@ -203,6 +204,15 @@
           <tbody class="divide-y divide-emerald-800/30">
             @for (product of filteredProducts(); track product.id) {
               <tr class="transition hover:bg-emerald-900/30">
+                <td class="px-6 py-4">
+                  @if (product.image_url) {
+                    <img [src]="product.image_url" [alt]="product.name" class="h-10 w-10 rounded-lg object-cover" />
+                  } @else {
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-900/40 text-sm font-bold text-emerald-300">
+                      {{ product.name.charAt(0) }}
+                    </div>
+                  }
+                </td>
                 <td class="px-6 py-4 font-medium text-emerald-400">{{ product.sku }}</td>
                 <td class="px-6 py-4 font-medium text-slate-100">{{ product.name }}</td>
                 <td class="px-6 py-4">
@@ -342,6 +352,36 @@
                 @if (errorFor(form.controls.sku); as error) {
                   <p class="mt-1 text-xs text-red-400">{{ error }}</p>
                 }
+              </div>
+
+              <!-- Photo -->
+              <div class="sm:col-span-2">
+                <label class="mb-1.5 block text-xs font-medium tracking-wide text-slate-300 uppercase">
+                  Photo du produit
+                </label>
+                <div class="flex items-center gap-4">
+                  <div class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-emerald-950/40 text-2xl font-bold text-emerald-300">
+                    @if (productImagePreview(); as preview) {
+                      <img [src]="preview" alt="Aperçu de la photo" class="h-full w-full object-cover" />
+                    } @else {
+                      <span>Photo</span>
+                    }
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <input
+                      id="product-image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      (change)="onImageSelected($event)"
+                      class="text-sm text-slate-300"
+                    />
+                    @if (productImage()) {
+                      <button type="button" (click)="removeSelectedImage()" class="text-xs font-medium text-red-300 hover:underline">
+                        Supprimer la photo
+                      </button>
+                    }
+                  </div>
+                </div>
               </div>
 
               <!-- Categorie -->

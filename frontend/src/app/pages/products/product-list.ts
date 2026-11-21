@@ -119,6 +119,12 @@ export class ProductList {
   /** Vrai quand la modale de creation est ouverte. */
   protected readonly isModalOpen = signal(false);
 
+  /** Photo selectionnee pour le nouveau produit. */
+  protected readonly productImage = signal<File | null>(null);
+
+  /** Apercu local de la photo selectionnee. */
+  protected readonly productImagePreview = signal<string | null>(null);
+
   /** Vrai pendant l'enregistrement du produit. */
   protected readonly submitting = signal(false);
 
@@ -221,6 +227,8 @@ export class ProductList {
       min_stock_alert: 0,
     });
     this.formError.set(null);
+    this.productImage.set(null);
+    this.productImagePreview.set(null);
     this.isModalOpen.set(true);
   }
 
@@ -229,6 +237,8 @@ export class ProductList {
     this.isModalOpen.set(false);
     this.submitting.set(false);
     this.formError.set(null);
+    this.productImage.set(null);
+    this.productImagePreview.set(null);
   }
 
   /** Ferme la modale quand la touche Echap est pressee. */
@@ -270,6 +280,43 @@ export class ProductList {
    * Le formulaire est d'abord valide cote client ; en cas d'echec, le message
    * renvoye par l'API est affiche dans la modale.
    */
+  /** Selectionne une photo et affiche son apercu. */
+  protected onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    if (!file) {
+      this.productImage.set(null);
+      this.productImagePreview.set(null);
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.formError.set('La photo doit être au format JPEG, PNG ou WebP.');
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.formError.set('La photo ne peut pas dépasser 2 Mo.');
+      input.value = '';
+      return;
+    }
+
+    this.productImage.set(file);
+    this.formError.set(null);
+
+    const reader = new FileReader();
+    reader.onload = () => this.productImagePreview.set(String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  }
+
+  /** Retire la photo selectionnee. */
+  protected removeSelectedImage(): void {
+    this.productImage.set(null);
+    this.productImagePreview.set(null);
+  }
+
   protected onSubmit(): void {
     if (this.submitting()) {
       return;
@@ -292,6 +339,7 @@ export class ProductList {
       sale_price: Number(value.sale_price),
       stock_quantity: Number(value.stock_quantity),
       min_stock_alert: Number(value.min_stock_alert),
+      image: this.productImage(),
     };
 
     this.submitting.set(true);

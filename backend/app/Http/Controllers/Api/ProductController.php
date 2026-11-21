@@ -12,7 +12,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -63,7 +65,15 @@ class ProductController extends Controller
     public function store(StoreProductRequest $request): JsonResponse
     {
         $product = DB::transaction(function () use ($request): Product {
-            $product = Product::create($request->validated());
+            $data = $request->validated();
+            unset($data['image'], $data['remove_image']);
+
+            $imagePath = null;
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')->store('products', 'public');
+            }
+
+            $product = Product::create(array_merge($data, ['image_path' => $imagePath]));
 
             $initialStock = (int) $product->stock_quantity;
 
@@ -111,7 +121,23 @@ class ProductController extends Controller
             $data = $request->validated();
             $before = (int) $lockedProduct->stock_quantity;
 
-            $lockedProduct->update($data);
+            unset($data['image'], $data['remove_image']);
+
+            if ($request->boolean('remove_image') && $lockedProduct->image_path !== null) {
+                Storage::disk('public')->delete($lockedProduct->image_path);
+                $lockedProduct->image_path = null;
+            }
+
+            if ($request->hasFile('image')) {
+                if ($lockedProduct->image_path !== null) {
+                    Storage::disk('public')->delete($lockedProduct->image_path);
+                }
+
+                $lockedProduct->image_path = $request->file('image')->store('products', 'public');
+            }
+
+            $lockedProduct->fill($data);
+            $lockedProduct->save();
 
             if (array_key_exists('stock_quantity', $data)) {
                 $after = (int) $lockedProduct->stock_quantity;
@@ -158,6 +184,10 @@ class ProductController extends Controller
             return response()->json([
                 'message' => 'Ce produit possède un historique (ventes, achats ou mouvements). Désactivez-le plutôt que de le supprimer.',
             ], Response::HTTP_CONFLICT);
+        }
+
+        if ($product->image_path !== null) {
+            Storage::disk('public')->delete($product->image_path);
         }
 
         $product->delete();

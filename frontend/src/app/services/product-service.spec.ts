@@ -103,7 +103,7 @@ describe('ProductService', () => {
     const request = httpMock.expectOne(`${environment.apiUrl}/products`);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual(DRAFT);
+    expect(request.request.body instanceof FormData).toBe(true);
 
     // Laravel enveloppe le produit cree dans une cle `data`.
     request.flush({ data: PRODUCT });

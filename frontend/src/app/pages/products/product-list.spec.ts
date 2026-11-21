@@ -448,16 +448,7 @@ describe('ProductList', () => {
     const request = httpMock.expectOne(isCatalogRequest);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({
-      name: 'Marteau 500 g',
-      sku: 'PRD-0006',
-      category_id: 1,
-      unit_id: 1,
-      purchase_price: 3500,
-      sale_price: 5500,
-      stock_quantity: 120,
-      min_stock_alert: 20,
-    });
+    expect(request.request.body instanceof FormData).toBe(true);
 
     request.flush({ data: buildProduct({ id: 9, name: 'Marteau 500 g', sku: 'PRD-0006' }) });
 

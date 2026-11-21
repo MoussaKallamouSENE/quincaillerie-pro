@@ -41,6 +41,8 @@ class UpdateProductRequest extends FormRequest
             'stock_quantity' => ['sometimes', 'integer', 'min:0'],
             'min_stock_alert' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+            'image' => ['sometimes', 'nullable', 'file', 'image', 'mimes:jpeg,png,webp', 'max:2048'],
+            'remove_image' => ['sometimes', 'boolean'],
         ];
     }
 

@@ -242,7 +242,7 @@ describe('Pos', () => {
   /** Bouton dont le libelle commence par le texte donne. */
   function buttonStartingWith(text: string): HTMLButtonElement | undefined {
     return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
-      (candidate) => candidate.textContent?.trim().startsWith(text),
+      (candidate) => candidate.textContent?.includes(text),
     ) as HTMLButtonElement | undefined;
   }
 

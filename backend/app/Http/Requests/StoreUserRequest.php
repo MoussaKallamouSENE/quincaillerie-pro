@@ -7,6 +7,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class StoreUserRequest extends FormRequest
 {
@@ -18,12 +19,7 @@ class StoreUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        if (! Gate::allows('gerer_utilisateurs')) {
-            return false;
-        }
-
-        return $this->input('role') !== 'Admin'
-            || (bool) $this->user()?->hasRole('Admin');
+        return Gate::allows('gerer_utilisateurs');
     }
 
     /**
@@ -38,7 +34,7 @@ class StoreUserRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'phone' => ['sometimes', 'nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8'],
-            'role' => ['required', 'string', 'exists:roles,name'],
+            'role' => ['required', 'string', Rule::exists(Role::class, 'name')->where('guard_name', 'web')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

@@ -244,6 +244,21 @@ export class Pos {
   /** Client selectionne pour la vente. */
   protected readonly selectedCustomerId = signal<number | null>(null);
 
+  /** Mode de saisie rapide d'un nouveau client. */
+  protected readonly newCustomerMode = signal(false);
+
+  /** Nom du nouveau client en cours de saisie. */
+  protected readonly newCustomerName = signal('');
+
+  /** Telephone facultatif du nouveau client. */
+  protected readonly newCustomerPhone = signal('');
+
+  /** Vrai pendant la creation du nouveau client. */
+  protected readonly newCustomerSubmitting = signal(false);
+
+  /** Message d'erreur de la saisie rapide. */
+  protected readonly newCustomerError = signal<string | null>(null);
+
   /** Client selectionne, ou `null` pour une vente sans client. */
   protected readonly selectedCustomer = computed<Customer | null>(() => {
     const id = this.selectedCustomerId();
@@ -370,6 +385,71 @@ export class Pos {
 
     // La session de caisse est verifiee a l'ouverture de l'ecran.
     this.loadSession();
+  }
+
+  /** Ouvre la saisie rapide d'un nouveau client. */
+  protected startNewCustomer(): void {
+    this.newCustomerMode.set(true);
+    this.newCustomerName.set('');
+    this.newCustomerPhone.set('');
+    this.newCustomerError.set(null);
+  }
+
+  /** Annule la saisie rapide sans perdre le panier ni le paiement. */
+  protected cancelNewCustomer(): void {
+    this.newCustomerMode.set(false);
+    this.newCustomerName.set('');
+    this.newCustomerPhone.set('');
+    this.newCustomerError.set(null);
+  }
+
+  /** Enregistre le nouveau client puis le selectionne. */
+  protected saveNewCustomer(): void {
+    const name = this.newCustomerName().trim();
+
+    if (!name) {
+      this.newCustomerError.set('Le nom du client est obligatoire.');
+      return;
+    }
+
+    const existing = this.customers.value()?.data.find(
+      (customer) => normalize(customer.name) === normalize(name),
+    );
+
+    if (existing) {
+      this.selectedCustomerId.set(existing.id);
+      this.cancelNewCustomer();
+      this.toastService.info(`Le client « ${existing.name} » existe déjà et a été sélectionné.`);
+      return;
+    }
+
+    this.newCustomerSubmitting.set(true);
+    this.newCustomerError.set(null);
+
+    this.customerService
+      .createCustomer({
+        name,
+        phone: this.newCustomerPhone().trim() || null,
+        email: null,
+        address: null,
+        credit_limit: 0,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (customer) => {
+          this.customers.reload();
+          this.selectedCustomerId.set(customer.id);
+          this.newCustomerMode.set(false);
+          this.newCustomerName.set('');
+          this.newCustomerPhone.set('');
+          this.newCustomerSubmitting.set(false);
+          this.toastService.success(`Client « ${customer.name} » créé et sélectionné.`);
+        },
+        error: (error: unknown) => {
+          this.newCustomerSubmitting.set(false);
+          this.newCustomerError.set(extractErrorMessage(error, 'Impossible de créer le client.'));
+        },
+      });
   }
 
   /** Verifie la session de caisse du vendeur. */

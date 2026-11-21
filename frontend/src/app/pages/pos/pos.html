@@ -350,6 +350,59 @@
             Dette en cours : {{ customer.outstanding_balance | number: '1.2-2' }} FCFA
           </p>
         }
+
+        @if (!newCustomerMode()) {
+          <button type="button" (click)="startNewCustomer()" class="pos-secondary-button">
+            + Nouveau client
+          </button>
+        } @else {
+          <div class="pos-new-customer">
+            <label class="pos-field-label" for="pos-new-customer-name">Nom du client</label>
+            <input
+              id="pos-new-customer-name"
+              type="text"
+              maxlength="255"
+              [value]="newCustomerName()"
+              (input)="newCustomerName.set(($any($event.target)).value)"
+              placeholder="Nom du nouveau client"
+              class="pos-input"
+            />
+
+            <label class="pos-field-label" for="pos-new-customer-phone">Téléphone (facultatif)</label>
+            <input
+              id="pos-new-customer-phone"
+              type="tel"
+              maxlength="255"
+              [value]="newCustomerPhone()"
+              (input)="newCustomerPhone.set(($any($event.target)).value)"
+              placeholder="Numéro de téléphone"
+              class="pos-input"
+            />
+
+            @if (newCustomerError(); as error) {
+              <p class="pos-field-warning">{{ error }}</p>
+            }
+
+            <div class="pos-new-customer-actions">
+              <button
+                type="button"
+                (click)="cancelNewCustomer()"
+                [disabled]="newCustomerSubmitting()"
+                class="pos-secondary-button"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                (click)="saveNewCustomer()"
+                [disabled]="newCustomerSubmitting()"
+                class="pos-primary-button"
+              >
+                {{ newCustomerSubmitting() ? 'Enregistrement…' : 'Enregistrer' }}
+              </button>
+            </div>
+          </div>
+        }
       </section>
 
       <section class="pos-section">
